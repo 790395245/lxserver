@@ -27,12 +27,12 @@ module.exports = {
   // 定义允许连接同步服务的用户
   users: [
     // 示例用户配置
-    // {
-    //   name: 'user1', // 用户名 (必须唯一)
-    //   password: '123.def', // 连接密码 (建议复杂一点)
-    //   maxSnapshotNum: 10, // 该用户独立的最大快照数设置 (可选)
-    //   'list.addMusicLocationType': 'top', // 该用户独立的添加歌曲位置设置 (可选)
-    // },
+    {
+      name: 'user1', // 用户名 (必须唯一)
+      password: '123456', // 连接密码 (建议复杂一点)
+      //   maxSnapshotNum: 10, // 该用户独立的最大快照数设置 (可选)
+      //   'list.addMusicLocationType': 'top', // 该用户独立的添加歌曲位置设置 (可选)
+    },
   ],
 
   // 环境变量配置说明

@@ -1,68 +1,293 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LX Music Sync Server - 数据可视化</title>
+    <title>LX Music Sync Server - 管理控制台</title>
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
-
 <body>
+    <!-- 登录界面 -->
     <div id="login-overlay" class="overlay">
         <div class="login-box glass">
-            <h1>访问控制</h1>
-            <p>请输入访问密码以继续</p>
-            <input type="password" id="access-password" placeholder="访问密码" />
-            <button id="login-btn">进入系统</button>
+            <div class="login-header">
+                <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 18V5l12-2v13M6 15v8m6-8v8"/>
+                </svg>
+                <h1>LX Sync Server</h1>
+            </div>
+            <p class="login-subtitle">管理控制台</p>
+            <input type="password" id="access-password" placeholder="请输入访问密码" autocomplete="off" />
+            <button id="login-btn" class="btn-primary">
+                <span>登录</span>
+            </button>
             <p id="login-error" class="error-msg"></p>
         </div>
     </div>
 
+    <!-- 主应用界面 -->
     <div id="app" class="hidden">
-        <header class="glass">
-            <div class="logo">LX Sync Server</div>
-            <div class="user-controls">
-                <span id="current-user-display">请选择用户</span>
-                <button id="logout-btn">退出登录</button>
+        <!-- 侧边栏 -->
+        <aside class="sidebar glass">
+            <div class="sidebar-header">
+                <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 18V5l12-2v13M6 15v8m6-8v8"/>
+                </svg>
+                <h2>LX Sync</h2>
             </div>
-        </header>
+            
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active" data-view="dashboard">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                        <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+                    </svg>
+                    <span>仪表盘</span>
+                </a>
+                <a href="#" class="nav-item" data-view="users">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+                    </svg>
+                    <span>用户管理</span>
+                </a>
+                <a href="#" class="nav-item" data-view="data">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                    </svg>
+                    <span>数据查看</span>
+                </a>
+                <a href="#" class="nav-item" data-view="config">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6M5.6 5.6l4.2 4.2m4.2 4.2l4.2 4.2M1 12h6m6 0h6M5.6 18.4l4.2-4.2m4.2-4.2l4.2-4.2"/>
+                    </svg>
+                    <span>系统配置</span>
+                </a>
+                <a href="#" class="nav-item" data-view="logs">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+                    </svg>
+                    <span>系统日志</span>
+                </a>
+            </nav>
 
-        <main>
-            <div id="user-selection" class="glass">
-                <h2>选择同步用户</h2>
-                <div id="users-list" class="users-grid">
-                    <!-- Users will be loaded here -->
+            <div class="sidebar-footer">
+                <button id="logout-btn" class="btn-logout">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>
+                    </svg>
+                    <span>退出登录</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- 主内容区 -->
+        <main class="main-content">
+            <header class="top-bar glass">
+                <h2 id="page-title">仪表盘</h2>
+                <div class="top-bar-actions">
+                    <div class="status-indicator">
+                        <span class="status-dot"></span>
+                        <span id="server-status">服务器运行中</span>
+                    </div>
+                </div>
+            </header>
+
+            <div class="content-wrapper">
+                <!-- 仪表盘视图 -->
+                <div id="view-dashboard" class="view active">
+                    <div class="stats-grid">
+                        <div class="stat-card glass">
+                            <div class="stat-icon users-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                    <circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+                                </svg>
+                            </div>
+                            <div class="stat-content">
+                                <h3>用户总数</h3>
+                                <p id="stat-users" class="stat-value">0</p>
+                            </div>
+                        </div>
+
+                        <div class="stat-card glass">
+                            <div class="stat-icon devices-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+                                    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+                                </svg>
+                            </div>
+                            <div class="stat-content">
+                                <h3>在线设备</h3>
+                                <p id="stat-devices" class="stat-value">0</p>
+                            </div>
+                        </div>
+
+                        <div class="stat-card glass">
+                            <div class="stat-icon uptime-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                                </svg>
+                            </div>
+                            <div class="stat-content">
+                                <h3>运行时间</h3>
+                                <p id="stat-uptime" class="stat-value">0h</p>
+                            </div>
+                        </div>
+
+                        <div class="stat-card glass">
+                            <div class="stat-icon memory-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                                    <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
+                                    <polyline points="17 7 22 7 22 12"/>
+                                </svg>
+                            </div>
+                            <div class="stat-content">
+                                <h3>内存使用</h3>
+                                <p id="stat-memory" class="stat-value">0 MB</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section-title">
+                        <h3>快速操作</h3>
+                    </div>
+                    <div class="quick-actions">
+                        <button class="action-btn glass" data-action="add-user">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                <circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/>
+                                <line x1="23" y1="11" x2="17" y2="11"/>
+                            </svg>
+                            <span>添加用户</span>
+                        </button>
+                        <button class="action-btn glass" data-action="view-logs">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                            </svg>
+                            <span>查看日志</span>
+                        </button>
+                        <button class="action-btn glass" data-action="edit-config">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6"/>
+                            </svg>
+                            <span>系统设置</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 用户管理视图 -->
+                <div id="view-users" class="view">
+                    <div class="view-header">
+                        <button id="add-user-btn" class="btn-primary">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                            </svg>
+                            <span>添加用户</span>
+                        </button>
+                    </div>
+                    <div id="users-list" class="users-grid"></div>
+                </div>
+
+                <!-- 数据查看视图 -->
+                <div id="view-data" class="view">
+                    <div class="view-header">
+                        <select id="data-user-select" class="select-input">
+                            <option value="">选择用户</option>
+                        </select>
+                        <button id="refresh-data-btn" class="btn-secondary">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                            </svg>
+                            <span>刷新</span>
+                        </button>
+                    </div>
+                    <div id="data-stats" class="data-stats"></div>
+                    <div id="data-content" class="data-content"></div>
+                </div>
+
+                <!-- 系统配置视图 -->
+                <div id="view-config" class="view">
+                    <form id="config-form" class="config-form glass">
+                        <h3>基本配置</h3>
+                        <div class="form-group">
+                            <label>服务器名称</label>
+                            <input type="text" name="serverName" class="form-input" />
+                        </div>
+                        <div class="form-group">
+                            <label>最大快照数</label>
+                            <input type="number" name="maxSnapshotNum" class="form-input" />
+                        </div>
+                        <div class="form-group">
+                            <label>添加歌曲位置</label>
+                            <select name="list.addMusicLocationType" class="form-input">
+                                <option value="top">顶部</option>
+                                <option value="bottom">底部</option>
+                            </select>
+                        </div>
+
+                        <h3>代理配置</h3>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="proxy.enabled" />
+                                <span>启用代理</span>
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label>代理请求头</label>
+                            <input type="text" name="proxy.header" class="form-input" />
+                        </div>
+
+                        <h3>前端配置</h3>
+                        <div class="form-group">
+                            <label>前端访问密码</label>
+                            <input type="password" name="frontend.password" class="form-input" />
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn-primary">保存配置</button>
+                            <button type="button" id="reload-config-btn" class="btn-secondary">重新加载</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- 系统日志视图 -->
+                <div id="view-logs" class="view">
+                    <div class="view-header">
+                        <select id="log-type-select" class="select-input">
+                            <option value="app">应用日志</option>
+                            <option value="access">访问日志</option>
+                            <option value="errors">错误日志</option>
+                        </select>
+                        <button id="refresh-logs-btn" class="btn-secondary">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                            </svg>
+                            <span>刷新</span>
+                        </button>
+                    </div>
+                    <div id="logs-content" class="logs-content glass"></div>
                 </div>
             </div>
-
-            <div id="dashboard-content" class="hidden">
-                <div class="stats-container">
-                    <div class="stat-card glass">
-                        <h3>总歌单数</h3>
-                        <p id="total-lists">0</p>
-                    </div>
-                    <div class="stat-card glass">
-                        <h3>总歌曲数</h3>
-                        <p id="total-songs">0</p>
-                    </div>
-                    <div class="stat-card glass">
-                        <h3>最后更新</h3>
-                        <p id="last-update">-</p>
-                    </div>
-                </div>
-
-                <div class="lists-container glass">
-                    <h2>歌单详情</h2>
-                    <div id="lists-content" class="lists-grid">
-                        <!-- Lists will be rendered here -->
-                    </div>
-                </div>
         </main>
+    </div>
+
+    <!-- 模态框 -->
+    <div id="modal" class="modal hidden">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <h3 id="modal-title">模态框标题</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div id="modal-body" class="modal-body"></div>
+        </div>
     </div>
 
     <script src="app.js"></script>
 </body>
-
 </html>

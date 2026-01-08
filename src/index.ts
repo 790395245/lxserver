@@ -124,6 +124,9 @@ if (envParams.LIST_ADD_MUSIC_LOCATION_TYPE) {
       break
   }
 }
+if (envParams.FRONTEND_PASSWORD) {
+  global.lx.config['frontend.password'] = envParams.FRONTEND_PASSWORD
+}
 
 if (envUsers.length) {
   const users: LX.Config['users'] = []
@@ -181,6 +184,34 @@ const checkUserConfig = (users: LX.Config['users']) => {
 checkAndCreateDir(global.lx.logPath)
 checkAndCreateDir(global.lx.dataPath)
 checkAndCreateDir(global.lx.userPath)
+checkAndCreateDir(global.lx.userPath)
+
+// Load users from users.json if exists
+const usersJsonPath = path.join(global.lx.dataPath, 'users.json')
+if (fs.existsSync(usersJsonPath)) {
+  try {
+    const users = JSON.parse(fs.readFileSync(usersJsonPath, 'utf-8'))
+    if (Array.isArray(users)) {
+      console.log('Load users from users.json')
+      global.lx.config.users = users.map(u => ({ ...u, dataPath: '' }))
+    }
+  } catch (err) {
+    console.error('Failed to load users.json', err)
+  }
+} else {
+  // Save initial users to users.json
+  try {
+    fs.writeFileSync(usersJsonPath, JSON.stringify(global.lx.config.users.map(u => ({
+      name: u.name,
+      password: u.password,
+      maxSnapshotNum: u.maxSnapshotNum,
+      'list.addMusicLocationType': u['list.addMusicLocationType'],
+    })), null, 2))
+  } catch (err) {
+    console.error('Failed to save users.json', err)
+  }
+}
+
 checkUserConfig(global.lx.config.users)
 
 console.log(`Users:
