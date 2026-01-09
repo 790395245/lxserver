@@ -1404,6 +1404,8 @@ class App {
                     if (data.status === 'uploading') {
                         const percent = (data.current / data.total) * 100;
                         this.updateProgress(percent, `正在上传备份: ${this.formatFileSize(data.current)} / ${this.formatFileSize(data.total)}`);
+                    } else if (data.status === 'packing') {
+                        this.updateProgress(5, data.message || '正在打包文件...');
                     } else if (data.status === 'preparing') {
                         this.updateProgress(0, data.message);
                     } else if (data.status === 'success') {
@@ -1412,9 +1414,24 @@ class App {
                 } else if (data.type === 'sync') {
                     if (data.status === 'processing') {
                         const percent = (data.current / data.total) * 100;
-                        this.updateProgress(percent, `正在同步文件 (${data.current}/${data.total}): ${data.file}`);
+                        this.updateProgress(percent, `正在同步文件 (${data.current}/${data.total}): ${data.file}`)
                     } else if (data.status === 'finish') {
                         this.updateProgress(100, '文件同步完成');
+                    }
+                } else if (data.type === 'restore') {
+                    if (data.status === 'processing') {
+                        const percent = (data.current / data.total) * 100;
+                        this.updateProgress(percent, `正在恢复文件 (${data.current}/${data.total}): ${data.file}`);
+                    } else if (data.status === 'downloading') {
+                        this.updateProgress(30, data.message || '正在下载备份...');
+                    } else if (data.status === 'extracting') {
+                        this.updateProgress(70, data.message || '正在解压备份...');
+                    } else if (data.status === 'start') {
+                        this.updateProgress(0, data.message || '正在从云端恢复数据...');
+                    } else if (data.status === 'finish') {
+                        this.updateProgress(100, data.message || '数据恢复完成');
+                    } else if (data.status === 'error') {
+                        this.updateProgress(0, data.message || '恢复失败');
                     }
                 } else if (data.type === 'file') {
                     // 单文件上传进度（如果需要显示）

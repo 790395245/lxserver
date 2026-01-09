@@ -78,8 +78,10 @@ class WebDAVSync extends EventEmitter {
 
     private getFileHash(filePath: string): string {
         try {
-            const content = fs.readFileSync(filePath)
-            return crypto.createHash('md5').update(content).digest('hex')
+            const buffer = fs.readFileSync(filePath)
+            const hash = crypto.createHash('md5')
+            hash.update(buffer as any)
+            return hash.digest('hex')
         } catch {
             return ''
         }
@@ -194,7 +196,7 @@ class WebDAVSync extends EventEmitter {
                 fs.mkdirSync(localDir, { recursive: true })
             }
 
-            fs.writeFileSync(localPath, content as Buffer)
+            fs.writeFileSync(localPath, content as any)
 
             this.addLog({
                 timestamp: Date.now(),
@@ -224,6 +226,19 @@ class WebDAVSync extends EventEmitter {
             await new Promise<void>((resolve, reject) => {
                 const output = fs.createWriteStream(zipPath)
                 const archive = archiver('zip', { zlib: { level: 9 } })
+
+                let fileCount = 0
+
+                // 监听文件添加事件
+                archive.on('entry', (entry: any) => {
+                    fileCount++
+                    this.emit('progress', {
+                        type: 'backup',
+                        status: 'packing',
+                        message: `正在打包文件: ${entry.name}`,
+                        current: fileCount
+                    })
+                })
 
                 output.on('close', () => resolve())
                 archive.on('error', (err) => reject(err))
@@ -367,6 +382,8 @@ class WebDAVSync extends EventEmitter {
         if (!this.client) return false
 
         try {
+            this.emit('progress', { type: 'restore', status: 'start', message: '正在获取备份列表...' })
+
             const items = await this.client.getDirectoryContents('/lx-sync-backups/')
             const backups = items
                 .filter((item: any) => item.basename.startsWith('lx-sync-backup-'))
@@ -375,10 +392,25 @@ class WebDAVSync extends EventEmitter {
             if (backups.length === 0) return false
 
             const latestBackup = backups[0]
+
+            this.emit('progress', {
+                type: 'restore',
+                status: 'downloading',
+                message: `正在下载备份: ${latestBackup.basename}`
+            })
+
             const content = await this.client.getFileContents(latestBackup.filename)
             const zipPath = path.join(this.dataPath, 'temp-restore.zip')
 
-            fs.writeFileSync(zipPath, content as Buffer)
+            // 修复类型错误：使用 as any
+            fs.writeFileSync(zipPath, content as any)
+
+            this.emit('progress', {
+                type: 'restore',
+                status: 'extracting',
+                message: '正在解压备份文件...'
+            })
+
             await this.extractZip(zipPath, this.dataPath)
             fs.unlinkSync(zipPath)
 
@@ -425,25 +457,56 @@ class WebDAVSync extends EventEmitter {
         if (!this.client) await this.initClient()
         if (!this.client) return false
 
+        // 1. 尝试恢复散文件
         try {
-            // 首先尝试同步散文件
             const items = await this.client.getDirectoryContents('/lx-sync/', { deep: true })
             const files = items.filter((item: any) => item.type === 'file')
 
             if (files.length > 0) {
                 console.log(`Restoring ${files.length} files from WebDAV...`)
+                const total = files.length
+                let current = 0
+
+                this.emit('progress', { type: 'restore', status: 'start', total, message: '开始从云端恢复数据...' })
+
                 for (const file of files) {
+                    current++
                     const relativePath = file.filename.replace('/lx-sync/', '')
+
+                    this.emit('progress', {
+                        type: 'restore',
+                        status: 'processing',
+                        current,
+                        total,
+                        file: relativePath,
+                        message: `正在恢复文件 (${current}/${total})`
+                    })
+
                     await this.downloadFile(relativePath)
                 }
+
+                this.emit('progress', { type: 'restore', status: 'finish', total, message: '数据恢复完成' })
                 return true
             }
+        } catch (err: any) {
+            // 忽略 /lx-sync/ 不存在的错误，继续尝试恢复备份
+            console.log('Scattered files not found or error, trying backup...', err.message)
+        }
 
-            // 如果没有散文件，下载最新备份
-            console.log('No individual files found, downloading latest backup...')
-            return await this.downloadLatestBackup()
-        } catch (err) {
+        // 2. 尝试恢复备份
+        try {
+            console.log('Downloading latest backup...')
+            this.emit('progress', { type: 'restore', status: 'start', message: '正在从云端下载备份...' })
+            const result = await this.downloadLatestBackup()
+            if (result) {
+                this.emit('progress', { type: 'restore', status: 'finish', message: '备份恢复完成' })
+            } else {
+                this.emit('progress', { type: 'restore', status: 'error', message: '未找到可用备份' })
+            }
+            return result
+        } catch (err: any) {
             console.error('Failed to restore from remote:', err)
+            this.emit('progress', { type: 'restore', status: 'error', message: '恢复失败: ' + err.message })
             return false
         }
     }
