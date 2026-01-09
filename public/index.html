@@ -409,92 +409,8 @@
                                 <p>强制同步所有变化</p>
                             </button>
                         </div>
-
-                        <!-- 同步状态 -->
-                        <div class="sync-status-section glass">
-                            <h3>同步状态</h3>
-                            <div id="sync-status-content">
-                                <p style="color: var(--text-secondary);">暂无状态信息</p>
-                            </div>
-                        </div>
-
-                        <!-- 同步日志 -->
-                        <div class="sync-logs-section glass">
-                            <div class="logs-header">
-                                <h3>同步日志</h3>
-                                <button id="refresh-sync-logs-btn" class="btn-secondary">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polyline points="23 4 23 10 17 10" />
-                                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-                                    </svg>
-                                    <span>刷新</span>
-                                </button>
-                            </div>
-                            <div id="sync-logs-content" class="sync-logs-list">
-                                <p style="color: var(--text-secondary); padding: 2rem; text-align: center;">暂无日志</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 新增：文件管理器视图 -->
-                <div id="view-files" class="view">
-                    <div class="file-manager">
-                        <!-- 文件操作工具栏 -->
-                        <div class="file-toolbar glass">
-                            <div class="file-breadcrumb" id="file-breadcrumb">
-                                <a href="#" data-path="">根目录</a>
-                            </div>
-                            <div class="file-toolbar-actions">
-                                <button id="new-file-btn" class="btn-secondary">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                        <polyline points="14 2 14 8 20 8" />
-                                        <line x1="12" y1="18" x2="12" y2="12" />
-                                        <line x1="9" y1="15" x2="15" y2="15" />
-                                    </svg>
-                                    <span>新建文件</span>
-                                </button>
-                                <button id="new-folder-btn" class="btn-secondary">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path
-                                            d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                                        <line x1="12" y1="11" x2="12" y2="17" />
-                                        <line x1="9" y1="14" x2="15" y2="14" />
-                                    </svg>
-                                    <span>新建文件夹</span>
-                                </button>
-                                <button id="refresh-files-btn" class="btn-secondary">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polyline points="23 4 23 10 17 10" />
-                                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- 文件列表 -->
-                        <div id="file-list" class="file-list glass">
-                            <div class="file-list-header">
-                                <div class="file-col-name">名称</div>
-                                <div class="file-col-size">大小</div>
-                                <div class="file-col-date">修改时间</div>
-                                <div class="file-col-actions">操作</div>
-                            </div>
-                            <div id="file-items"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 系统日志视图 -->
-                <div id="view-logs" class="view">
-                    <div class="view-header">
-                        <select id="log-type-select" class="select-input">
-                            <option value="app">应用日志</option>
-                            <option value="access">访问日志</option>
-                            <option value="errors">错误日志</option>
-                        </select>
-                        <button id="refresh-logs-btn" class="btn-secondary">
+                        <h3>同步日志</h3>
+                        <button id="refresh-sync-logs-btn" class="btn-secondary">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="23 4 23 10 17 10" />
                                 <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
@@ -502,45 +418,116 @@
                             <span>刷新</span>
                         </button>
                     </div>
-                    <div id="logs-content" class="logs-content glass"></div>
-                </div>
-                <!-- 快照管理视图 -->
-                <div id="view-snapshots" class="view">
-                    <div class="view-header">
-                        <div class="header-left">
-                            <h3>快照列表</h3>
-                            <p class="text-secondary">查看和管理服务器端的数据快照，支持下载备份或回滚服务器状态。</p>
-                        </div>
-                        <div style="display: flex; gap: 10px;">
-                            <select id="snapshot-user-select" class="select-input">
-                                <option value="">选择用户</option>
-                            </select>
-                            <button onclick="app.loadSnapshots()" class="btn-secondary">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M23 4v6h-6"></path>
-                                    <path d="M1 20v-6h6"></path>
-                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15">
-                                    </path>
-                                </svg>
-                                刷新
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="snapshots-container glass">
-                        <div class="snapshots-table-header">
-                            <div class="col-time">创建时间</div>
-                            <div class="col-id">快照 ID</div>
-                            <div class="col-size">大小</div>
-                            <div class="col-actions">操作</div>
-                        </div>
-                        <div id="snapshots-list" class="snapshots-list">
-                            <!-- 快照列表将在这里渲染 -->
-                        </div>
+                    <div id="sync-logs-content" class="sync-logs-list">
+                        <p style="color: var(--text-secondary); padding: 2rem; text-align: center;">暂无日志</p>
                     </div>
                 </div>
             </div>
-        </main>
+    </div>
+
+    <!-- 新增：文件管理器视图 -->
+    <div id="view-files" class="view">
+        <div class="file-manager">
+            <!-- 文件操作工具栏 -->
+            <div class="file-toolbar glass">
+                <div class="file-breadcrumb" id="file-breadcrumb">
+                    <a href="#" data-path="">根目录</a>
+                </div>
+                <div class="file-toolbar-actions">
+                    <button id="new-file-btn" class="btn-secondary">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                            <line x1="12" y1="18" x2="12" y2="12" />
+                            <line x1="9" y1="15" x2="15" y2="15" />
+                        </svg>
+                        <span>新建文件</span>
+                    </button>
+                    <button id="new-folder-btn" class="btn-secondary">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                            <line x1="12" y1="11" x2="12" y2="17" />
+                            <line x1="9" y1="14" x2="15" y2="14" />
+                        </svg>
+                        <span>新建文件夹</span>
+                    </button>
+                    <button id="refresh-files-btn" class="btn-secondary">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="23 4 23 10 17 10" />
+                            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 文件列表 -->
+            <div id="file-list" class="file-list glass">
+                <div class="file-list-header">
+                    <div class="file-col-name">名称</div>
+                    <div class="file-col-size">大小</div>
+                    <div class="file-col-date">修改时间</div>
+                    <div class="file-col-actions">操作</div>
+                </div>
+                <div id="file-items"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 系统日志视图 -->
+    <div id="view-logs" class="view">
+        <div class="view-header">
+            <select id="log-type-select" class="select-input">
+                <option value="app">应用日志</option>
+                <option value="access">访问日志</option>
+                <option value="errors">错误日志</option>
+            </select>
+            <button id="refresh-logs-btn" class="btn-secondary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="23 4 23 10 17 10" />
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                </svg>
+                <span>刷新</span>
+            </button>
+        </div>
+        <div id="logs-content" class="logs-content glass"></div>
+    </div>
+    <!-- 快照管理视图 -->
+    <div id="view-snapshots" class="view">
+        <div class="view-header">
+            <div class="header-left">
+                <h3>快照列表</h3>
+                <p class="text-secondary">查看和管理服务器端的数据快照，支持下载备份或回滚服务器状态。</p>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <select id="snapshot-user-select" class="select-input">
+                    <option value="">选择用户</option>
+                </select>
+                <button onclick="app.loadSnapshots()" class="btn-secondary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 4v6h-6"></path>
+                        <path d="M1 20v-6h6"></path>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15">
+                        </path>
+                    </svg>
+                    刷新
+                </button>
+            </div>
+        </div>
+
+        <div class="snapshots-container glass">
+            <div class="snapshots-table-header">
+                <div class="col-time">创建时间</div>
+                <div class="col-id">快照 ID</div>
+                <div class="col-size">大小</div>
+                <div class="col-actions">操作</div>
+            </div>
+            <div id="snapshots-list" class="snapshots-list">
+                <!-- 快照列表将在这里渲染 -->
+            </div>
+        </div>
+    </div>
+    </div>
+    </main>
     </div>
 
     <!-- 模态框 -->

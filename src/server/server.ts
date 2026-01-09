@@ -13,6 +13,27 @@ import { ElFinderConnector, getSystemRoot } from './elfinderConnector'
 import formidable from 'formidable'
 
 
+const getMime = (filename: string) => {
+  const ext = path.extname(filename).toLowerCase()
+  const mimeTypes: Record<string, string> = {
+    '.txt': 'text/plain',
+    '.js': 'application/javascript',
+    '.json': 'application/json',
+    '.html': 'text/html',
+    '.css': 'text/css',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.gif': 'image/gif',
+    '.svg': 'image/svg+xml',
+    '.pdf': 'application/pdf',
+    '.zip': 'application/zip',
+    '.mp3': 'audio/mpeg',
+    '.mp4': 'video/mp4',
+  }
+  return mimeTypes[ext] || 'application/octet-stream'
+}
+
 let status: LX.Sync.Status = {
   status: false,
   message: '',
@@ -703,7 +724,9 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
 
       // elFinder 文件管理器连接器
       if (pathname === '/api/elfinder/connector') {
-        const auth = req.headers['x-frontend-auth']
+        // [修改] 优先从 Header 获取，如果没有则尝试从 URL 参数获取 (用于支持下载和预览)
+        const auth = req.headers['x-frontend-auth'] || urlObj.searchParams.get('auth')
+
         if (auth !== global.lx.config['frontend.password']) {
           res.writeHead(401)
           res.end('Unauthorized')
@@ -723,6 +746,27 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
               const connector = new ElFinderConnector(getSystemRoot())
               const cmd = params.cmd || 'open'
               const result = await connector.handle(cmd, params)
+
+              // [新增] 处理文件下载 (file) 和 打包下载 (zipdl)
+              if ((cmd === 'file' || cmd === 'zipdl') && result.path && !result.error) {
+                if (fs.existsSync(result.path)) {
+                  const mime = getMime(result.path)
+                  const headers: any = { 'Content-Type': mime }
+
+                  // 如果是下载请求，或者是打包下载，强制添加附件头
+                  if (params.download === '1' || cmd === 'zipdl') {
+                    headers['Content-Disposition'] = `attachment; filename="${encodeURIComponent(path.basename(result.path))}"`
+                  }
+
+                  res.writeHead(200, headers)
+                  fs.createReadStream(result.path).pipe(res)
+                  return
+                } else {
+                  res.writeHead(404)
+                  res.end('Not Found')
+                  return
+                }
+              }
 
               res.writeHead(200, { 'Content-Type': 'application/json' })
               res.end(JSON.stringify(result))
@@ -787,7 +831,28 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
             // 普通POST数据
             void readBody(req).then(async body => {
               try {
-                const params = JSON.parse(body || '{}')
+                // 修改开始：兼容 JSON 和 x-www-form-urlencoded
+                let params: any = {}
+                try {
+                  params = JSON.parse(body || '{}')
+                } catch (e) {
+                  // 如果 JSON 解析失败，尝试解析为 URL 查询参数格式
+                  const urlParams = new URLSearchParams(body)
+                  urlParams.forEach((value, key) => {
+                    // 处理数组情况 (例如 targets[])
+                    if (params[key]) {
+                      if (Array.isArray(params[key])) {
+                        params[key].push(value)
+                      } else {
+                        params[key] = [params[key], value]
+                      }
+                    } else {
+                      params[key] = value
+                    }
+                  })
+                }
+                // 修改结束
+
                 const connector = new ElFinderConnector(getSystemRoot())
                 const cmd = params.cmd || 'open'
                 const result = await connector.handle(cmd, params)

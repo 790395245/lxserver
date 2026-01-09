@@ -1213,9 +1213,13 @@ class App {
 
         const statusEl = document.getElementById('sync-status-content');
         statusEl.innerHTML = '<p style="color: var(--accent-warning);">正在备份...</p>';
+        this.showProgress(true);
 
         try {
-            const result = await this.request('/api/webdav/backup', { method: 'POST' });
+            const result = await this.request('/api/webdav/backup', {
+                method: 'POST',
+                body: JSON.stringify({ force: true })
+            });
             if (result.success) {
                 statusEl.innerHTML = '<p style="color: var(--accent-success);">✅ 备份成功！</p>';
                 this.loadSyncLogs();
@@ -1224,6 +1228,8 @@ class App {
             }
         } catch (err) {
             statusEl.innerHTML = '<p style="color: var(--accent-error);">❌ 备份失败: ' + err.message + '</p>';
+        } finally {
+            setTimeout(() => this.showProgress(false), 3000);
         }
     }
 
@@ -1247,23 +1253,91 @@ class App {
     }
 
     async syncFilesToWebDAV() {
-        if (!confirm('确定要同步所有已更改的文件到WebDAV吗？')) return;
+        if (!confirm('确定要强制同步所有文件到WebDAV吗？')) return;
 
         const statusEl = document.getElementById('sync-status-content');
         statusEl.innerHTML = '<p style="color: var(--accent-warning);">正在同步文件...</p>';
+        this.showProgress(true);
 
-        // 触发一次备份即可，因为备份会检查变化
         try {
-            const result = await this.request('/api/webdav/backup', { method: 'POST' });
+            const result = await this.request('/api/webdav/sync', { method: 'POST' });
             if (result.success) {
                 statusEl.innerHTML = '<p style="color: var(--accent-success);">✅ 同步成功！</p>';
                 this.loadSyncLogs();
             } else {
-                statusEl.innerHTML = '<p style="color: var(--accent-success);">ℹ️ 没有需要同步的变化</p>';
+                statusEl.innerHTML = '<p style="color: var(--accent-error);">❌ 同步失败</p>';
             }
         } catch (err) {
             statusEl.innerHTML = '<p style="color: var(--accent-error);">❌ 同步失败: ' + err.message + '</p>';
+        } finally {
+            setTimeout(() => this.showProgress(false), 3000);
         }
+    }
+
+    showProgress(show) {
+        const container = document.getElementById('sync-progress-container');
+        if (show) {
+            container.classList.remove('hidden');
+            this.updateProgress(0, '准备中...');
+        } else {
+            container.classList.add('hidden');
+        }
+    }
+
+    updateProgress(percent, text) {
+        const bar = document.getElementById('progress-bar');
+        const textEl = document.getElementById('progress-text');
+        const percentEl = document.getElementById('progress-percent');
+
+        if (bar) bar.style.width = `${percent}%`;
+        if (textEl) textEl.textContent = text;
+        if (percentEl) percentEl.textContent = `${Math.round(percent)}%`;
+    }
+
+    initSSE() {
+        if (this.sseSource) return;
+
+        const auth = this.password || localStorage.getItem('lx_auth');
+        if (!auth) return;
+
+        this.sseSource = new EventSource(`/api/webdav/progress?auth=${encodeURIComponent(auth)}`);
+
+        this.sseSource.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                // console.log('SSE Progress:', data);
+
+                if (data.type === 'backup') {
+                    if (data.status === 'uploading') {
+                        const percent = (data.current / data.total) * 100;
+                        this.updateProgress(percent, `正在上传备份: ${this.formatFileSize(data.current)} / ${this.formatFileSize(data.total)}`);
+                    } else if (data.status === 'preparing') {
+                        this.updateProgress(0, data.message);
+                    } else if (data.status === 'success') {
+                        this.updateProgress(100, '备份上传完成');
+                    }
+                } else if (data.type === 'sync') {
+                    if (data.status === 'processing') {
+                        const percent = (data.current / data.total) * 100;
+                        this.updateProgress(percent, `正在同步文件 (${data.current}/${data.total}): ${data.file}`);
+                    } else if (data.status === 'finish') {
+                        this.updateProgress(100, '文件同步完成');
+                    }
+                } else if (data.type === 'file') {
+                    // 单文件上传进度（如果需要显示）
+                    if (data.status === 'uploading') {
+                        // 可以在这里更新更细粒度的进度，但可能会闪烁太快
+                    }
+                }
+            } catch (e) {
+                console.error('SSE Parse Error:', e);
+            }
+        };
+
+        this.sseSource.onerror = (err) => {
+            // console.error('SSE Error:', err);
+            // 连接失败不报错，静默重试
+        };
     }
 
     async loadSyncLogs() {
@@ -1508,6 +1582,7 @@ class App {
         document.getElementById('restore-webdav-btn')?.addEventListener('click', () => this.restoreFromWebDAV());
         document.getElementById('sync-files-btn')?.addEventListener('click', () => this.syncFilesToWebDAV());
         document.getElementById('refresh-sync-logs-btn')?.addEventListener('click', () => this.loadSyncLogs());
+        this.initSSE();
     }
 
     bindFileManagerEvents() {
