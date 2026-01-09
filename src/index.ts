@@ -127,6 +127,32 @@ if (envParams.LIST_ADD_MUSIC_LOCATION_TYPE) {
 if (envParams.FRONTEND_PASSWORD) {
   global.lx.config['frontend.password'] = envParams.FRONTEND_PASSWORD
 }
+if (envParams.WEBDAV_URL) {
+  global.lx.config['webdav.url'] = envParams.WEBDAV_URL
+}
+if (envParams.WEBDAV_USERNAME) {
+  global.lx.config['webdav.username'] = envParams.WEBDAV_USERNAME
+}
+if (envParams.WEBDAV_PASSWORD) {
+  global.lx.config['webdav.password'] = envParams.WEBDAV_PASSWORD
+}
+if (envParams.SYNC_INTERVAL) {
+  const interval = parseInt(envParams.SYNC_INTERVAL)
+  if (!isNaN(interval)) global.lx.config['sync.interval'] = interval
+}
+if (envParams.USER_ENABLE_PATH) {
+  global.lx.config['user.enablePath'] = envParams.USER_ENABLE_PATH === 'true'
+}
+if (envParams.USER_ENABLE_ROOT) {
+  global.lx.config['user.enableRoot'] = envParams.USER_ENABLE_ROOT === 'true'
+}
+if (envParams.PORT) {
+  const port = parseInt(envParams.PORT, 10)
+  if (!isNaN(port) && port > 0) global.lx.config.port = port
+}
+if (envParams.BIND_IP) {
+  global.lx.config.bindIP = envParams.BIND_IP
+}
 
 if (envUsers.length) {
   const users: LX.Config['users'] = []
@@ -173,9 +199,12 @@ const checkAndCreateDir = (path: string) => {
 const checkUserConfig = (users: LX.Config['users']) => {
   const userNames: string[] = []
   const passwords: string[] = []
+  // 允许重复密码的条件：开启了路径模式 且 关闭了根路径模式
+  const allowDuplicatePasswords = global.lx.config['user.enablePath'] && !global.lx.config['user.enableRoot']
+
   for (const user of users) {
     if (userNames.includes(user.name)) exit('User name duplicate: ' + user.name)
-    if (passwords.includes(user.password)) exit('User password duplicate: ' + user.password)
+    if (!allowDuplicatePasswords && passwords.includes(user.password)) exit('User password duplicate: ' + user.password)
     userNames.push(user.name)
     passwords.push(user.password)
   }
@@ -245,8 +274,8 @@ function normalizePort(val: string) {
  * Get port from environment and store in Express.
  */
 
-const port = normalizePort(envParams.PORT ?? '9527')
-const bindIP = envParams.BIND_IP ?? '127.0.0.1'
+// const port = normalizePort(envParams.PORT ?? '9527')
+// const bindIP = envParams.BIND_IP ?? '127.0.0.1'
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { createModuleEvent } = require('@/event')
@@ -257,5 +286,33 @@ require('@/utils/migrate').default(global.lx.dataPath, global.lx.userPath)
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { startServer } = require('@/server')
-startServer(port, bindIP)
+
+// 初始化 WebDAV 同步
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const WebDAVSync = require('@/utils/webdavSync').default
+const webdavSync = new WebDAVSync({
+  url: global.lx.config['webdav.url'],
+  username: global.lx.config['webdav.username'],
+  password: global.lx.config['webdav.password'],
+  interval: global.lx.config['sync.interval'],
+}, global.lx.dataPath)
+
+// 如果配置了 WebDAV，在启动时尝试从远程恢复
+if (webdavSync.isConfigured()) {
+  console.log('WebDAV configured, attempting to restore from remote...')
+  void webdavSync.restoreFromRemote().then((success: boolean) => {
+    if (success) {
+      console.log('Data restored from WebDAV successfully')
+    }
+    // 启动自动同步
+    webdavSync.startAutoSync()
+  })
+} else {
+  console.log('WebDAV not configured, skipping remote restore')
+}
+
+// 导出 webdavSync 实例供 API 使用
+global.lx.webdavSync = webdavSync
+
+startServer(global.lx.config.port, global.lx.config.bindIP)
 

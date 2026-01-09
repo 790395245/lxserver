@@ -44,6 +44,30 @@ declare namespace LX {
     'proxy.header': string
 
     /**
+     * 绑定IP
+     */
+    bindIP: string
+
+    /**
+     * 端口
+     */
+    port: number
+
+    /**
+     * 是否开启用户路径 /<userName>
+     */
+
+    /**
+     * 是否开启用户路径 /<userName>
+     */
+    'user.enablePath'?: boolean
+
+    /**
+     * 是否开启根路径 /
+     */
+    'user.enableRoot'?: boolean
+
+    /**
      * 公共最大备份快照数
      */
     maxSnapshotNum: number
@@ -62,6 +86,26 @@ declare namespace LX {
      * 前端访问密码
      */
     'frontend.password'?: string
+
+    /**
+     * WebDAV URL
+     */
+    'webdav.url'?: string
+
+    /**
+     * WebDAV 用户名
+     */
+    'webdav.username'?: string
+
+    /**
+     * WebDAV 密码
+     */
+    'webdav.password'?: string
+
+    /**
+     * 同步间隔(分钟)
+     */
+    'sync.interval'?: number
   }
 }
 

@@ -7,6 +7,7 @@ declare global {
     dataPath: string
     userPath: string
     config: LX.Config
+    webdavSync?: any  // WebDAVSync instance
   }
 
   // var envParams: LX.EnvParams
@@ -16,4 +17,4 @@ declare global {
 
 }
 
-export {}
+export { }

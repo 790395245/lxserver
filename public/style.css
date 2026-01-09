@@ -595,7 +595,7 @@ body {
 /* =============== 配置表单 =============== */
 .config-form {
     padding: 2rem;
-    max-width: 800px;
+    max-width: 100%;
 }
 
 .config-form h3 {
@@ -702,14 +702,58 @@ body {
 }
 
 /* =============== 选择输入 =============== */
-.select-input {
-    padding: 0.75rem 1rem;
+.select-input,
+select.form-input,
+#data-user-select,
+#log-type-select {
+    padding: 0.75rem 2.5rem 0.75rem 1rem;
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid var(--glass-border);
     border-radius: 8px;
     color: var(--text-primary);
     font-size: 0.95rem;
     cursor: pointer;
+    transition: all 0.3s ease;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23ffffff' fill-opacity='0.6' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    background-size: 12px;
+}
+
+.select-input:hover,
+select.form-input:hover,
+#data-user-select:hover,
+#log-type-select:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.select-input:focus,
+select.form-input:focus,
+#data-user-select:focus,
+#log-type-select:focus {
+    outline: none;
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+/* 选择框选项样式 */
+.select-input option,
+select.form-input option,
+#data-user-select option,
+#log-type-select option {
+    background: rgb(20, 20, 35);
+    color: var(--text-primary);
+    padding: 0.5rem;
+}
+
+.select-input option:checked,
+select.form-input option:checked {
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+    color: white;
 }
 
 /* =============== 模态框 =============== */
@@ -816,11 +860,1579 @@ body {
         overflow-x: auto;
     }
 
+
+    .users-grid,
+    .playlists-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* 优化 view-header 按钮样式 */
+.view-header button {
+    padding: 0.625rem 1.25rem !important;
+    font-size: 0.875rem !important;
+}
+
+.view-header button svg {
+    width: 16px !important;
+    height: 16px !important;
+}
+
+/* 改进的响应式设计 */
+@media (max-width: 1200px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .content-wrapper {
+        padding: 0 1.5rem 1.5rem;
+    }
+}
+
+@media (max-width: 1024px) {
+    .sidebar {
+        width: 220px;
+    }
+
+    .main-content {
+        padding: 1rem 0.5rem 1rem 0;
+    }
+
+    .top-bar {
+        padding: 1rem 1.5rem;
+    }
+
+    .top-bar h2 {
+        font-size: 1.25rem;
+    }
+}
+
+@media (max-width: 768px) {
+    #app {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        height: auto;
+        position: static;
+        margin: 0.5rem;
+        padding: 1rem;
+    }
+
+    .sidebar-header h2 {
+        font-size: 1.125rem;
+    }
+
+    .sidebar-nav {
+        flex-direction: row;
+        overflow-x: auto;
+        gap: 0.25rem;
+        padding-bottom: 0.5rem;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .sidebar-nav::-webkit-scrollbar {
+        height: 4px;
+    }
+
+    .nav-item {
+        flex-direction: column;
+        padding: 0.75rem;
+        min-width: 80px;
+        font-size: 0.75rem;
+        text-align: center;
+    }
+
     .nav-item span {
-        display: none;
+        font-size: 0.75rem;
+    }
+
+    .nav-item svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .sidebar-footer {
+        margin-top: 0.5rem;
+    }
+
+    .main-content {
+        padding: 0.5rem;
+    }
+
+    .top-bar {
+        padding: 1rem;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+
+    .top-bar h2 {
+        font-size: 1.25rem;
+    }
+
+    .top-bar-actions {
+        width: 100%;
+    }
+
+    .status-indicator {
+        font-size: 0.875rem;
+    }
+
+    .content-wrapper {
+        padding: 0 1rem 1rem;
     }
 
     .stats-grid {
         grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .stat-card {
+        padding: 1.25rem;
+    }
+
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+    }
+
+    .stat-icon svg {
+        width: 24px;
+        height: 24px;
+    }
+
+    .stat-value {
+        font-size: 1.75rem;
+    }
+
+    .quick-actions {
+        grid-template-columns: 1fr;
+    }
+
+    .users-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .view-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .view-header button,
+    .view-header select {
+        width: 100%;
+    }
+
+    .config-form {
+        padding: 1.5rem;
+    }
+
+    .form-actions {
+        flex-direction: column;
+    }
+
+    .form-actions button {
+        width: 100%;
+    }
+
+    .modal-content {
+        width: 95%;
+        padding: 1.5rem;
+    }
+
+    .data-stats {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .login-box {
+        padding: 2rem;
+    }
+
+    .login-box h1 {
+        font-size: 1.5rem;
+    }
+
+    .sidebar {
+        margin: 0.25rem;
+    }
+
+    .sidebar-nav {
+        gap: 0;
+    }
+
+    .nav-item {
+        min-width: 70px;
+        padding: 0.625rem 0.5rem;
+    }
+
+    .stat-content h3 {
+        font-size: 0.75rem;
+    }
+
+    .stat-value {
+        font-size: 1.5rem;
+    }
+
+    .top-bar h2 {
+        font-size: 1.125rem;
+    }
+}
+
+/* =============== WebDAV 同步 =============== */
+.webdav-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.sync-actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+}
+
+.action-card {
+    padding: 1.5rem;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.action-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-xl);
+}
+
+.action-card svg {
+    width: 48px;
+    height: 48px;
+    color: var(--accent-primary);
+}
+
+.action-card h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.action-card p {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+.sync-status-section,
+.sync-logs-section {
+    padding: 1.5rem;
+}
+
+.sync-status-section h3,
+.sync-logs-section h3 {
+    font-size: 1.125rem;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+}
+
+.logs-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.logs-header h3 {
+    margin: 0;
+}
+
+.sync-logs-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.sync-log-item {
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--glass-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.sync-log-item:last-child {
+    border-bottom: none;
+}
+
+.log-info {
+    flex: 1;
+}
+
+.log-type {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-right: 0.5rem;
+}
+
+.log-type-upload {
+    background: rgba(59, 130, 246, 0.2);
+    color: var(--accent-primary);
+}
+
+.log-type-download {
+    background: rgba(139, 92, 246, 0.2);
+    color: var(--accent-secondary);
+}
+
+.log-type-backup {
+    background: rgba(16, 185, 129, 0.2);
+    color: var(--accent-success);
+}
+
+.log-type-restore {
+    background: rgba(245, 158, 11, 0.2);
+    color: var(--accent-warning);
+}
+
+.log-file {
+    font-family: monospace;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+}
+
+.log-status {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+}
+
+.log-status-success {
+    background: rgba(16, 185, 129, 0.2);
+    color: var(--accent-success);
+}
+
+.log-status-error {
+    background: rgba(239, 68, 68, 0.2);
+    color: var(--accent-error);
+}
+
+.log-time {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* =============== 文件管理器 =============== */
+.file-manager {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.file-toolbar {
+    padding: 1rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.file-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.file-breadcrumb a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.875rem;
+    transition: color 0.3s ease;
+}
+
+.file-breadcrumb a:hover {
+    color: var(--accent-primary);
+}
+
+.file-breadcrumb a:not(:last-child)::after {
+    content: '/';
+    margin-left: 0.5rem;
+    color: var(--text-muted);
+}
+
+.file-toolbar-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.file-list {
+    padding: 0;
+    min-height: 400px;
+}
+
+.file-list-header {
+    display: grid;
+    grid-template-columns: 2fr 120px 150px 200px;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--glass-border);
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.file-item {
+    display: grid;
+    grid-template-columns: 2fr 120px 150px 200px;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--glass-border);
+    align-items: center;
+    transition: background 0.3s ease;
+}
+
+.file-item:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.file-item:last-child {
+    border-bottom: none;
+}
+
+.file-name {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.file-name:hover {
+    color: var(--accent-primary);
+}
+
+.file-icon {
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.file-size {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.file-date {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.file-item-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.file-item-actions button {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
+    border: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.file-item-actions button:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--accent-primary);
+}
+
+/* 文件编辑器模态框 */
+.file-editor-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 3000;
+}
+
+.file-editor-content {
+    width: 90%;
+    max-width: 900px;
+    height: 80vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.file-editor-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--glass-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.file-editor-body {
+    flex: 1;
+    padding: 1.5rem;
+    overflow: auto;
+}
+
+.file-editor-textarea {
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    padding: 1rem;
+    color: var(--text-primary);
+    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    resize: none;
+}
+
+.file-editor-footer {
+    padding: 1.5rem;
+    border-top: 1px solid var(--glass-border);
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+}
+
+/* 响应式 - 文件管理器 */
+@media (max-width: 768px) {
+    .sync-actions-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .file-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .file-toolbar-actions {
+        justify-content: space-between;
+    }
+
+    .file-list-header,
+    .file-item {
+        grid-template-columns: 1fr;
+    }
+
+    .file-col-size,
+    .file-col-date {
+        display: none;
+    }
+
+    .file-size,
+    .file-date {
+        display: none;
+    }
+
+    .file-item-actions {
+        justify-content: flex-start;
+    }
+}
+
+/* =============== 数据查看 - 歌单卡片 =============== */
+.playlists-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.playlists-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+}
+
+.playlists-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.playlist-card {
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.playlist-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-xl);
+}
+
+.playlist-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    gap: 1rem;
+}
+
+.playlist-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.playlist-name {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.playlist-meta {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.playlist-id {
+    font-family: monospace;
+}
+
+.playlist-count {
+    color: var(--accent-primary);
+    font-weight: 500;
+}
+
+.playlist-card-actions {
+    display: flex;
+    gap: 0.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--glass-border);
+}
+
+.btn-view,
+.btn-delete-playlist {
+    flex: 1;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    border: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.btn-view {
+    background: rgba(59, 130, 246, 0.15);
+    color: var(--accent-primary);
+}
+
+.btn-view:hover {
+    background: rgba(59, 130, 246, 0.25);
+}
+
+.btn-delete-playlist {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--accent-error);
+}
+
+.btn-delete-playlist:hover {
+    background: rgba(239, 68, 68, 0.25);
+}
+
+.btn-view svg,
+.btn-delete-playlist svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* =============== 歌单详情 =============== */
+.playlist-detail-header {
+    margin-bottom: 1.5rem;
+}
+
+.btn-back {
+    padding: 0.5rem 1rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    border-radius: 6px;
+    color: var(--text-primary);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    transition: all 0.3s ease;
+}
+
+.btn-back:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--accent-primary);
+}
+
+.btn-back svg {
+    width: 16px;
+    height: 16px;
+}
+
+.playlist-detail-header h3 {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.playlist-detail-meta {
+    display: flex;
+    gap: 1.5rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+/* =============== 歌曲表格 =============== */
+.songs-table {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.songs-table-header {
+    display: grid;
+    grid-template-columns: 50px 2fr 1.5fr 1.5fr 100px 80px;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    background: rgba(255, 255, 255, 0.02);
+    border-bottom: 1px solid var(--glass-border);
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.song-row {
+    display: grid;
+    grid-template-columns: 50px 2fr 1.5fr 1.5fr 100px 80px;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--glass-border);
+    align-items: center;
+    transition: background 0.3s ease;
+}
+
+.song-row:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.song-row:last-child {
+    border-bottom: none;
+}
+
+.song-col-index {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    text-align: center;
+}
+
+.song-col-name {
+    font-weight: 500;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.song-col-artist,
+.song-col-album,
+.song-col-source {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.song-col-actions {
+    display: flex;
+    justify-content: center;
+}
+
+.btn-delete-song {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: none;
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--accent-error);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.btn-delete-song:hover {
+    background: rgba(239, 68, 68, 0.2);
+}
+
+.btn-delete-song svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* 响应式 */
+@media (max-width: 1024px) {
+
+    .songs-table-header,
+    .song-row {
+        grid-template-columns: 40px 2fr 1fr 80px;
+    }
+
+    .song-col-album,
+    .song-col-source {
+        display: none;
+    }
+}
+
+@media (max-width: 768px) {
+
+    .songs-table-header,
+    .song-row {
+        grid-template-columns: 1fr 60px;
+        grid-template-areas:
+            "name actions"
+            "meta meta";
+    }
+
+    .song-col-index {
+        display: none;
+    }
+
+    .song-col-name {
+        grid-area: name;
+    }
+
+    .song-col-actions {
+        grid-area: actions;
+    }
+
+    .song-col-artist {
+        grid-area: meta;
+        grid-column: 1 / -1;
+    }
+}
+
+/* =============== 可点击的统计卡片 =============== */
+.data-stat-card.clickable {
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.data-stat-card.clickable:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--accent-primary);
+}
+
+.data-stat-card.clickable:active {
+    transform: translateY(0);
+}
+
+/* =============== 歌单标题编辑 =============== */
+.playlist-title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.playlist-title-row h3 {
+    margin: 0;
+}
+
+.btn-edit-name {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: none;
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--accent-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.btn-edit-name:hover {
+    background: rgba(59, 130, 246, 0.2);
+    transform: scale(1.05);
+}
+
+.btn-edit-name svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* =============== 批量操作 =============== */
+.batch-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+}
+
+.batch-select-btns {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-batch {
+    padding: 0.5rem 1rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    border-radius: 6px;
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: all 0.3s ease;
+}
+
+.btn-batch:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--accent-primary);
+}
+
+.btn-batch-delete {
+    padding: 0.5rem 1.25rem;
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 6px;
+    color: var(--accent-error);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-batch-delete:hover:not(:disabled) {
+    background: rgba(239, 68, 68, 0.25);
+    border-color: var(--accent-error);
+}
+
+.btn-batch-delete:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-batch-delete svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* =============== 歌曲复选框列 =============== */
+.song-col-checkbox {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.song-col-checkbox input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--accent-primary);
+}
+
+/* 更新歌曲表格列布局 */
+.songs-table-header,
+.song-row {
+    grid-template-columns: 40px 50px 2fr 1.5fr 1.5fr 100px 80px;
+}
+
+/* 响应式调整 */
+@media (max-width: 1024px) {
+
+    .songs-table-header,
+    .song-row {
+        grid-template-columns: 40px 40px 2fr 1fr 80px;
+    }
+
+    .batch-actions {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+    }
+
+    .batch-select-btns {
+        justify-content: center;
+    }
+}
+
+@media (max-width: 768px) {
+
+    .songs-table-header,
+    .song-row {
+        grid-template-columns: 32px 1fr 60px;
+        grid-template-areas:
+            "checkbox name actions"
+            "meta meta meta";
+    }
+
+    .song-col-index,
+    .song-col-album,
+    .song-col-source {
+        display: none;
+    }
+
+    .song-col-checkbox {
+        grid-area: checkbox;
+    }
+
+    .song-col-name {
+        grid-area: name;
+    }
+
+    .song-col-actions {
+        grid-area: actions;
+    }
+
+    .song-col-artist {
+        grid-area: meta;
+        grid-column: 1 / -1;
+        padding-left: 2.5rem;
+    }
+
+    .batch-select-btns {
+        flex-wrap: wrap;
+    }
+
+    .btn-batch {
+        flex: 1;
+        min-width: 80px;
+    }
+}
+
+/* =============== 搜索排序栏 =============== */
+.search-sort-bar {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    align-items: center;
+}
+
+.search-box {
+    flex: 1;
+    position: relative;
+    max-width: 400px;
+}
+
+.search-box input {
+    width: 100%;
+    padding: 0.75rem 1rem 0.75rem 2.75rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+}
+
+.search-box input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.search-box svg {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 18px;
+    height: 18px;
+    color: var(--text-secondary);
+    pointer-events: none;
+}
+
+.sort-select {
+    padding: 0.75rem 2.5rem 0.75rem 1rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23ffffff' fill-opacity='0.6' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    background-size: 12px;
+    min-width: 150px;
+}
+
+.sort-select:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-color: var(--accent-primary);
+}
+
+.sort-select:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* =============== 优化歌曲表格列宽 =============== */
+/* 默认布局 - 没有复选框的视图 */
+.songs-table-header:not(:has(.song-col-checkbox)),
+.song-row:not(:has(.song-col-checkbox)) {
+    grid-template-columns: 50px minmax(180px, 2.5fr) minmax(120px, 1.5fr) minmax(120px, 1.5fr) 100px;
+}
+
+/* 查看所有歌曲时的布局（包含所属列表） */
+.songs-table-header:has(.song-col-playlist),
+.song-row:has(.song-col-playlist) {
+    grid-template-columns: 50px minmax(160px, 2fr) minmax(100px, 1.2fr) minmax(100px, 1.2fr) 80px minmax(100px, 1.2fr);
+}
+
+/* 所属列表列样式 */
+.song-col-playlist {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 优化文本截断显示 */
+.song-col-name,
+.song-col-artist,
+.song-col-album,
+.song-col-playlist {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 添加 title 属性提示完整内容 */
+.song-col-name[title],
+.song-col-artist[title],
+.song-col-album[title] {
+    cursor: help;
+}
+
+/* 响应式调整 - 搜索排序栏 */
+@media (max-width: 768px) {
+    .search-sort-bar {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .search-box {
+        max-width: 100%;
+    }
+
+    .sort-select {
+        width: 100%;
+    }
+
+    /* 所有歌曲视图在移动端的调整 */
+    .songs-table-header:has(.song-col-playlist),
+    .song-row:has(.song-col-playlist) {
+        grid-template-columns: 1fr 100px;
+        grid-template-areas:
+            "name playlist"
+            "meta meta";
+    }
+
+    .song-col-index {
+        display: none;
+    }
+
+    .song-col-name {
+        grid-area: name;
+    }
+
+    .song-col-playlist {
+        grid-area: playlist;
+        text-align: right;
+    }
+
+    .song-col-artist {
+        grid-area: meta;
+        grid-column: 1 / -1;
+        padding-left: 1rem;
+        font-size: 0.75rem;
+    }
+
+    .song-col-album,
+    .song-col-source,
+    .song-col-actions {
+        display: none !important;
+    }
+}
+
+/* =============== 用户管理表格样式 =============== */
+
+/* 定义表格网格布局：复选框 | 用户名 | 密码 | 状态 | 操作 */
+.users-table-header,
+.user-row {
+    display: grid;
+    /* 40px(复选框) 1fr(用户名) 1fr(密码) 100px(状态) 120px(操作) */
+    grid-template-columns: 40px 1fr 1fr 100px 120px;
+    gap: 1rem;
+    align-items: center;
+    padding: 1rem;
+    border-bottom: 1px solid var(--glass-border);
+}
+
+/* 复选框列居中 */
+.col-checkbox {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* 密码列样式 */
+.col-password {
+    font-family: monospace;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* 密码掩码样式 */
+.password-text {
+    min-width: 60px;
+}
+
+/* 图标按钮样式 (用于显示密码/编辑密码) */
+.btn-icon {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-icon:hover {
+    color: var(--accent-primary);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* 批量删除按钮样式已在 index.html 中定义为 btn-danger，这里确保样式存在 */
+.btn-danger {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--accent-error);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.btn-danger:hover {
+    background: rgba(239, 68, 68, 0.2);
+}
+
+/* =============== 模态框底部按钮布局修复 =============== */
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    /* 按钮靠右对齐 */
+    gap: 1rem;
+    /* 按钮之间的间距 */
+    margin-top: 2rem;
+    /* 与上方输入框的间距 */
+}
+
+/* 修复模态框中主按钮宽度过大的问题 */
+.modal-footer .btn-primary {
+    width: auto;
+    /* 取消默认的 100% 宽度 */
+    min-width: 100px;
+    /* 设置一个最小宽度 */
+    padding: 0.75rem 1.5rem;
+    /* 确保内边距一致 */
+}
+
+/* 确保取消按钮样式一致 */
+.modal-footer .btn-secondary {
+    width: auto;
+    min-width: 80px;
+    justify-content: center;
+    /* 文字居中 */
+}
+
+/* 移动端适配：在小屏幕上按钮可能需要堆叠或平分 */
+@media (max-width: 480px) {
+    .modal-footer {
+        flex-direction: row;
+        /* 保持水平排列 */
+    }
+
+    .modal-footer .btn-primary,
+    .modal-footer .btn-secondary {
+        flex: 1;
+        /* 小屏幕上两个按钮平分宽度 */
+        width: 100%;
+    }
+}
+
+/* =============== 修复输入框自动填充样式 =============== */
+/* 强制覆盖浏览器自动填充的白色背景 */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px #1a1f3a inset !important;
+    /* 增加阴影大小以确保覆盖 */
+    -webkit-text-fill-color: #e2e8f0 !important;
+    transition: background-color 5000s ease-in-out 0s;
+    caret-color: #e2e8f0;
+    /* 确保光标颜色可见 */
+}
+
+/* 确保普通输入框背景为深色 */
+.form-input,
+.login-box input {
+    background: rgba(255, 255, 255, 0.05);
+    color: #e2e8f0;
+    border: 1px solid var(--glass-border);
+    width: 100%;
+    /* 确保宽度填满 */
+    box-sizing: border-box;
+    /* 包含 padding 和 border */
+}
+
+.form-input:focus,
+.login-box input:focus {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    outline: none;
+    border-color: var(--accent-primary);
+}
+
+/* =============== 用户列表布局修复 =============== */
+
+/* 定义列表容器为垂直排列，而不是网格卡片 */
+.users-table-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+/* 确保每一行占满宽度 */
+.user-row {
+    width: 100%;
+    /* 保持之前的 grid 定义 */
+    display: grid;
+    grid-template-columns: 40px 1fr 1fr 100px 120px;
+    gap: 1rem;
+    align-items: center;
+    padding: 1rem;
+    border-bottom: 1px solid var(--glass-border);
+}
+
+/* 移动端适配用户列表 */
+@media (max-width: 768px) {
+
+    .users-table-header,
+    .user-row {
+        grid-template-columns: 40px 1fr 1fr 80px;
+        /* 隐藏操作列或调整宽度 */
+        font-size: 0.875rem;
+    }
+
+    .col-actions {
+        display: none;
+        /* 移动端暂时隐藏操作列，或者改为弹出菜单 */
+    }
+
+    /* 或者让操作列挤在最后 */
+    .users-table-header,
+    .user-row {
+        grid-template-columns: 30px 1fr 60px 40px;
+        gap: 0.5rem;
+    }
+
+    .col-password {
+        display: none;
+        /* 移动端隐藏密码列以节省空间 */
+    }
+}
+
+/* =============== 修复用户名列布局 =============== */
+.col-name {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    /* 头像和文字之间的间距 */
+    overflow: hidden;
+    /* 防止文字溢出 */
+}
+
+.user-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    color: white;
+    flex-shrink: 0;
+    /* 防止头像被压缩 */
+}
+
+/* 修复操作列按钮样式 */
+.col-actions .btn-delete {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--accent-error);
+    transition: all 0.2s;
+}
+
+.col-actions .btn-delete:hover {
+    background: rgba(239, 68, 68, 0.2);
+}
+
+.col-actions .btn-delete svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* =============== 快照管理 =============== */
+.snapshots-container {
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+.snapshots-table-header {
+    display: grid;
+    grid-template-columns: 200px 1fr 100px 200px;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    background: rgba(255, 255, 255, 0.02);
+    border-bottom: 1px solid var(--glass-border);
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.snapshot-row {
+    display: grid;
+    grid-template-columns: 200px 1fr 100px 200px;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--glass-border);
+    align-items: center;
+    transition: background 0.3s ease;
+}
+
+.snapshot-row:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.snapshot-row:last-child {
+    border-bottom: none;
+}
+
+.col-id {
+    font-family: monospace;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.snapshot-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-download,
+.btn-restore {
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    border: none;
+    font-size: 0.875rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.btn-download {
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--accent-primary);
+}
+
+.btn-download:hover {
+    background: rgba(59, 130, 246, 0.2);
+}
+
+.btn-restore {
+    background: rgba(245, 158, 11, 0.1);
+    color: var(--accent-warning);
+}
+
+.btn-restore:hover {
+    background: rgba(245, 158, 11, 0.2);
+}
+
+@media (max-width: 768px) {
+
+    .snapshots-table-header,
+    .snapshot-row {
+        grid-template-columns: 1fr 120px;
+        gap: 0.5rem;
+    }
+
+    .col-id,
+    .col-size {
+        display: none;
     }
 }

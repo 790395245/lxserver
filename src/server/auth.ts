@@ -40,8 +40,9 @@ const verifyByKey = (encryptMsg: string, userId: string) => {
   return null
 }
 
-const verifyByCode = (encryptMsg: string, users: LX.Config['users']) => {
+const verifyByCode = (encryptMsg: string, users: LX.Config['users'], targetUserName?: string) => {
   for (const userInfo of users) {
+    if (targetUserName && userInfo.name !== targetUserName) continue
     let key = toMD5(userInfo.password).substring(0, 16)
     // const iv = Buffer.from(key.split('').reverse().join('')).toString('base64')
     key = Buffer.from(key).toString('base64')
@@ -70,7 +71,7 @@ const verifyByCode = (encryptMsg: string, users: LX.Config['users']) => {
   return null
 }
 
-export const authCode = async(req: http.IncomingMessage, res: http.ServerResponse, users: LX.Config['users']) => {
+export const authCode = async (req: http.IncomingMessage, res: http.ServerResponse, users: LX.Config['users'], targetUserName?: string) => {
   let code = 401
   let msg: string = SYNC_CODE.msgAuthFailed
 
@@ -80,7 +81,7 @@ export const authCode = async(req: http.IncomingMessage, res: http.ServerRespons
       const userId = req.headers.i
       const _msg = typeof userId == 'string' && userId
         ? verifyByKey(req.headers.m, userId)
-        : verifyByCode(req.headers.m, users)
+        : verifyByCode(req.headers.m, users, targetUserName)
       if (_msg != null) {
         msg = _msg
         code = 200
@@ -118,7 +119,7 @@ const verifyConnection = (encryptMsg: string, userId: string) => {
   // console.log(text)
   return text == SYNC_CODE.msgConnect
 }
-export const authConnect = async(req: http.IncomingMessage) => {
+export const authConnect = async (req: http.IncomingMessage) => {
   let ip = getAvailableIP(req)
   if (ip) {
     const query = querystring.parse((req.url as string).split('?')[1])

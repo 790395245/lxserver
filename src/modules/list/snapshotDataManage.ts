@@ -25,7 +25,7 @@ export class SnapshotDataManage {
     return this.clientSnapshotKeys.includes(key)
   }
 
-  clearOldSnapshot = async() => {
+  clearOldSnapshot = async () => {
     if (!this.snapshotInfo) return
     const snapshotList = this.snapshotInfo.list.filter(key => !this.isIncluedsDevice(key))
     // console.log(snapshotList.length, lx.config.maxSnapshotNum)
@@ -41,7 +41,7 @@ export class SnapshotDataManage {
     if (requiredSave) this.saveSnapshotInfo(this.snapshotInfo)
   }
 
-  updateDeviceSnapshotKey = async(clientId: string, key: string) => {
+  updateDeviceSnapshotKey = async (clientId: string, key: string) => {
     // console.log('updateDeviceSnapshotKey', key)
     let client = this.snapshotInfo.clients[clientId]
     if (!client) client = this.snapshotInfo.clients[clientId] = { snapshotKey: '', lastSyncDate: 0 }
@@ -52,13 +52,13 @@ export class SnapshotDataManage {
     this.saveSnapshotInfoThrottle()
   }
 
-  getDeviceCurrentSnapshotKey = async(clientId: string) => {
+  getDeviceCurrentSnapshotKey = async (clientId: string) => {
     // console.log('updateDeviceSnapshotKey', key)
     const client = this.snapshotInfo.clients[clientId]
     return client?.snapshotKey
   }
 
-  getSnapshotInfo = async(): Promise<SnapshotInfo> => {
+  getSnapshotInfo = async (): Promise<SnapshotInfo> => {
     return this.snapshotInfo
   }
 
@@ -76,7 +76,7 @@ export class SnapshotDataManage {
     this.saveSnapshotInfoThrottle()
   }
 
-  getSnapshot = async(name: string) => {
+  getSnapshot = async (name: string) => {
     const filePath = path.join(this.snapshotDir, `snapshot_${name}`)
     let listData: LX.Sync.List.ListData
     try {
@@ -88,7 +88,7 @@ export class SnapshotDataManage {
     return listData
   }
 
-  saveSnapshot = async(name: string, data: string) => {
+  saveSnapshot = async (name: string, data: string) => {
     syncLog.info('saveSnapshot', this.userDataManage.userName, name)
     const filePath = path.join(this.snapshotDir, `snapshot_${name}`)
     try {
@@ -99,7 +99,7 @@ export class SnapshotDataManage {
     }
   }
 
-  removeSnapshot = async(name: string) => {
+  removeSnapshot = async (name: string) => {
     syncLog.info('removeSnapshot', this.userDataManage.userName, name)
     const filePath = path.join(this.snapshotDir, `snapshot_${name}`)
     try {
@@ -107,6 +107,36 @@ export class SnapshotDataManage {
     } catch (err) {
       syncLog.error(err)
     }
+  }
+
+  getSnapshotListWithMeta = async () => {
+    const list = []
+    for (const name of this.snapshotInfo.list) {
+      const filePath = path.join(this.snapshotDir, `snapshot_${name}`)
+      try {
+        const stat = await fs.promises.stat(filePath)
+        list.push({
+          id: name,
+          time: stat.mtimeMs,
+          size: stat.size,
+        })
+      } catch (e) {
+        // ignore missing files
+      }
+    }
+    // Sort by time desc
+    return list.sort((a, b) => b.time - a.time)
+  }
+
+  clearClients = () => {
+    this.snapshotInfo.clients = {}
+    this.clientSnapshotKeys = []
+    this.saveSnapshotInfoThrottle()
+  }
+
+  setLatest = (name: string) => {
+    this.snapshotInfo.latest = name
+    this.saveSnapshotInfoThrottle()
   }
 
 

@@ -9,6 +9,8 @@ import { accessLog, startupLog, syncLog } from '@/utils/log4js'
 import { SYNC_CLOSE_CODE, SYNC_CODE } from '@/constants'
 import { getUserSpace, releaseUserSpace, getUserName, getServerId } from '@/user'
 import { createMsg2call } from 'message2call'
+import { ElFinderConnector, getSystemRoot } from './elfinderConnector'
+import formidable from 'formidable'
 
 
 let status: LX.Sync.Status = {
@@ -116,7 +118,8 @@ const authConnection = (req: http.IncomingMessage, callback: (err: string | null
   authConnect(req).then(() => {
     callback(null, true)
   }).catch(err => {
-    callback(err, false)
+    // console.log('WebSocket auth failed:', err.message)
+    callback(null, false) // <--- 修改为传递 null, false
   })
 }
 
@@ -200,12 +203,13 @@ const serveStatic = (req: IncomingMessage, res: http.ServerResponse, filePath: s
 }
 
 const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Promise((resolve, reject) => {
-  const httpServer = http.createServer((req, res) => {
+  const httpServer = http.createServer(async (req, res) => {
     // console.log(req.url)
     const urlObj = new URL(req.url ?? '', `http://${req.headers.host}`)
     const pathname = urlObj.pathname
 
     if (pathname.startsWith('/api/')) {
+
       if (pathname === '/api/login' && req.method === 'POST') {
         void readBody(req).then(body => {
           try {
@@ -227,7 +231,8 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
 
 
 
-      if (pathname === '/api/users') {
+      // [新增] 获取服务器状态
+      if (pathname === '/api/status' && req.method === 'GET') {
         const auth = req.headers['x-frontend-auth']
         if (auth !== global.lx.config['frontend.password']) {
           res.writeHead(401)
@@ -235,13 +240,32 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
           return
         }
 
+        const status = {
+          users: global.lx.config.users.length,
+          devices: wss?.clients.size ?? 0,
+          uptime: process.uptime(),
+          memory: process.memoryUsage().rss
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify(status))
+        return
+      }
+
+      if (pathname === '/api/users') {
+        const auth = req.headers['x-frontend-auth']
+        if (auth !== global.lx.config['frontend.password']) {
+          res.writeHead(401)
+          res.end('Unauthorized')
+          return
+        }
         if (req.method === 'GET') {
-          const users = global.lx.config.users.map(u => ({ name: u.name }))
+          // 修改：返回包含密码的用户列表
+          const users = global.lx.config.users.map(u => ({ name: u.name, password: u.password }))
           res.writeHead(200, { 'Content-Type': 'application/json' })
           res.end(JSON.stringify(users))
           return
         }
-
         if (req.method === 'POST') {
           void readBody(req).then(body => {
             try {
@@ -278,40 +302,71 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
           })
           return
         }
-
-        if (req.method === 'DELETE') {
+        if (req.method === 'PUT') {
           void readBody(req).then(body => {
             try {
-              const { name } = JSON.parse(body)
-              if (!name) {
+              const { name, password } = JSON.parse(body)
+              if (!name || !password) {
                 res.writeHead(400)
-                res.end('Missing name')
+                res.end('Missing name or password')
                 return
               }
-              const idx = global.lx.config.users.findIndex(u => u.name === name)
-              if (idx === -1) {
+              const user = global.lx.config.users.find(u => u.name === name)
+              if (!user) {
                 res.writeHead(404)
                 res.end('User not found')
                 return
               }
 
-              // Disconnect user if connected
-              // eslint-disable-next-line @typescript-eslint/no-var-requires
-              const { removeDevice } = require('@/server/server')
-              // Need to find all devices for this user
-              // But removeDevice takes clientId. 
-              // We can just force close connections for this user.
-              if (wss) {
-                for (const client of wss.clients) {
-                  if (client.userInfo?.name === name) client.close(SYNC_CLOSE_CODE.normal)
-                }
-              }
-
-              global.lx.config.users.splice(idx, 1)
+              // 更新密码
+              user.password = password
               saveUsers()
 
               res.writeHead(200)
               res.end(JSON.stringify({ success: true }))
+            } catch (e) {
+              res.writeHead(500)
+              res.end('Server Error')
+            }
+          })
+          return
+        }
+        if (req.method === 'DELETE') {
+          void readBody(req).then(body => {
+            try {
+              // 修改：同时支持单个 name 和批量 names
+              const { name, names } = JSON.parse(body)
+              const targets = names || (name ? [name] : [])
+
+              if (targets.length === 0) {
+                res.writeHead(400)
+                res.end('Missing name or names')
+                return
+              }
+
+              let deletedCount = 0
+              for (const targetName of targets) {
+                const idx = global.lx.config.users.findIndex(u => u.name === targetName)
+                if (idx !== -1) {
+                  // 断开该用户的连接
+                  if (wss) {
+                    for (const client of wss.clients) {
+                      if (client.userInfo?.name === targetName) client.close(SYNC_CLOSE_CODE.normal)
+                    }
+                  }
+                  global.lx.config.users.splice(idx, 1)
+                  deletedCount++
+                }
+              }
+
+              if (deletedCount > 0) {
+                saveUsers()
+                res.writeHead(200)
+                res.end(JSON.stringify({ success: true, deletedCount }))
+              } else {
+                res.writeHead(404)
+                res.end('User not found')
+              }
             } catch (e) {
               res.writeHead(500)
               res.end('Server Error')
@@ -346,6 +401,411 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
         })
         return
       }
+      // 获取快照列表
+      if (pathname === '/api/data/snapshots' && req.method === 'GET') {
+        const user = urlObj.searchParams.get('user')
+        if (!user) {
+          res.writeHead(400)
+          res.end('Missing user param')
+          return
+        }
+        const userSpace = getUserSpace(user)
+        if (!userSpace) {
+          res.writeHead(401)
+          res.end('Unauthorized')
+          return
+        }
+        try {
+          const list = await userSpace.listManage.getSnapshotList()
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify(list))
+        } catch (err: any) {
+          res.writeHead(500)
+          res.end(err.message)
+        }
+        return
+      }
+
+      // 下载快照数据
+      if (pathname === '/api/data/snapshot' && req.method === 'GET') {
+        const user = urlObj.searchParams.get('user')
+        if (!user) {
+          res.writeHead(400)
+          res.end('Missing user param')
+          return
+        }
+        const userSpace = getUserSpace(user)
+        if (!userSpace) {
+          res.writeHead(401)
+          res.end('Unauthorized')
+          return
+        }
+        const id = urlObj.searchParams.get('id')
+        if (!id) {
+          res.writeHead(400)
+          res.end('Missing id')
+          return
+        }
+        try {
+          const data = await userSpace.listManage.getSnapshot(id)
+          if (!data) {
+            res.writeHead(404)
+            res.end('Not Found')
+            return
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify(data))
+        } catch (err: any) {
+          res.writeHead(500)
+          res.end(err.message)
+        }
+        return
+      }
+
+      // 恢复快照
+      if (pathname === '/api/data/restore-snapshot' && req.method === 'POST') {
+        const user = urlObj.searchParams.get('user')
+        if (!user) {
+          res.writeHead(400)
+          res.end('Missing user param')
+          return
+        }
+        const userSpace = getUserSpace(user)
+        if (!userSpace) {
+          res.writeHead(401)
+          res.end('Unauthorized')
+          return
+        }
+        try {
+          const body = await readBody(req)
+          const { id } = JSON.parse(body)
+          if (!id) throw new Error('Missing id')
+
+          await userSpace.listManage.restoreSnapshot(id)
+
+          res.writeHead(200)
+          res.end('OK')
+        } catch (err: any) {
+          res.writeHead(500)
+          res.end(err.message)
+        }
+        return
+      }
+
+      // 删除歌单
+      if (pathname === '/api/data/delete-playlist' && req.method === 'POST') {
+        const auth = req.headers['x-frontend-auth']
+        if (auth !== global.lx.config['frontend.password']) {
+          res.writeHead(401)
+          res.end('Unauthorized')
+          return
+        }
+
+
+        void readBody(req).then(async body => {
+          try {
+            const { username, playlistId } = JSON.parse(body)
+
+            // 检查用户是否存在
+            if (!global.lx.config.users.some(u => u.name === username)) {
+              res.writeHead(404)
+              res.end('User not found')
+              return
+            }
+
+            const userSpace = getUserSpace(username)
+            const listManage = userSpace.listManage
+
+            // 删除歌单
+            await listManage.listDataManage.userListsRemove([playlistId])
+            // 创建快照
+            await listManage.createSnapshot()
+
+            res.writeHead(200, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ success: true }))
+          } catch (err: any) {
+            res.writeHead(500)
+            res.end(err.message)
+          }
+        })
+        return
+      }
+
+      // 删除歌曲
+      if (pathname === '/api/data/delete-song' && req.method === 'POST') {
+        const auth = req.headers['x-frontend-auth']
+        if (auth !== global.lx.config['frontend.password']) {
+          res.writeHead(401)
+          res.end('Unauthorized')
+          return
+        }
+
+        void readBody(req).then(async body => {
+          try {
+            const { username, playlistId, songIndex } = JSON.parse(body)
+
+            // 检查用户是否存在
+            if (!global.lx.config.users.some(u => u.name === username)) {
+              res.writeHead(404)
+              res.end('User not found')
+              return
+            }
+
+            const userSpace = getUserSpace(username)
+            const listManage = userSpace.listManage
+            const listData = await listManage.getListData()
+
+            // 获取歌单
+            const playlist = listData.userList.find((list: any) => list.id === playlistId)
+
+            if (!playlist) {
+              res.writeHead(404)
+              res.end('Playlist not found')
+              return
+            }
+
+            if (!playlist.list || songIndex >= playlist.list.length) {
+              res.writeHead(404)
+              res.end('Song not found')
+              return
+            }
+
+            const songInfo = playlist.list[songIndex]
+            // 从歌单中删除歌曲
+            await listManage.listDataManage.listMusicRemove(playlistId, [songInfo.id])
+            // 创建快照
+            await listManage.createSnapshot()
+
+            res.writeHead(200, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ success: true }))
+          } catch (err: any) {
+            res.writeHead(500)
+            res.end(err.message)
+          }
+        })
+        return
+      }
+      // 重命名歌单
+      if (pathname === '/api/data/rename-playlist' && req.method === 'POST') {
+        const auth = req.headers['x-frontend-auth']
+        if (auth !== global.lx.config['frontend.password']) {
+          res.writeHead(401)
+          res.end('Unauthorized')
+          return
+        }
+
+        void readBody(req).then(async body => {
+          try {
+            const { username, playlistId, newName } = JSON.parse(body)
+
+            // 检查用户是否存在
+            if (!global.lx.config.users.some(u => u.name === username)) {
+              res.writeHead(404)
+              res.end('User not found')
+              return
+            }
+
+            const userSpace = getUserSpace(username)
+            const listManage = userSpace.listManage
+            const listData = await listManage.getListData()
+
+            // 查找歌单
+            const playlist = listData.userList.find((list: any) => list.id === playlistId)
+
+            if (!playlist) {
+              res.writeHead(404)
+              res.end('Playlist not found')
+              return
+            }
+
+            // 更新歌单信息
+            await listManage.listDataManage.userListsUpdate([{
+              id: playlist.id,
+              name: newName,
+              source: playlist.source,
+              sourceListId: playlist.sourceListId,
+              locationUpdateTime: playlist.locationUpdateTime
+            }])
+            // 创建快照
+            await listManage.createSnapshot()
+
+            res.writeHead(200, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ success: true }))
+          } catch (err: any) {
+            res.writeHead(500)
+            res.end(err.message)
+          }
+        })
+        return
+      }
+
+      // 批量删除歌曲
+      if (pathname === '/api/data/batch-delete-songs' && req.method === 'POST') {
+        const auth = req.headers['x-frontend-auth']
+        if (auth !== global.lx.config['frontend.password']) {
+          res.writeHead(401)
+          res.end('Unauthorized')
+          return
+        }
+
+        void readBody(req).then(async body => {
+          try {
+            const { username, playlistId, songIndices } = JSON.parse(body)
+
+            // 检查用户是否存在
+            if (!global.lx.config.users.some(u => u.name === username)) {
+              res.writeHead(404)
+              res.end('User not found')
+              return
+            }
+
+            const userSpace = getUserSpace(username)
+            const listManage = userSpace.listManage
+            const listData = await listManage.getListData()
+
+            // 获取歌单
+            const playlist = listData.userList.find((list: any) => list.id === playlistId)
+
+            if (!playlist) {
+              res.writeHead(404)
+              res.end('Playlist not found')
+              return
+            }
+
+            // 获取要删除的歌曲ID列表
+            const songIds = songIndices.map((index: number) => {
+              if (playlist.list && playlist.list[index]) {
+                return playlist.list[index].id
+              }
+              return null
+            }).filter((id: any) => id !== null)
+
+            if (songIds.length === 0) {
+              res.writeHead(400)
+              res.end('No valid songs to delete')
+              return
+            }
+
+            // 批量删除歌曲
+            await listManage.listDataManage.listMusicRemove(playlistId, songIds)
+            // 创建快照
+            await listManage.createSnapshot()
+
+            res.writeHead(200, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ success: true, deletedCount: songIds.length }))
+          } catch (err: any) {
+            res.writeHead(500)
+            res.end(err.message)
+          }
+        })
+        return
+      }
+
+      // elFinder 文件管理器连接器
+      if (pathname === '/api/elfinder/connector') {
+        const auth = req.headers['x-frontend-auth']
+        if (auth !== global.lx.config['frontend.password']) {
+          res.writeHead(401)
+          res.end('Unauthorized')
+          return
+        }
+
+        // 处理GET请求
+        if (req.method === 'GET') {
+          void (async () => {
+            try {
+              const params: any = {}
+              const url = new URL(req.url || '', `http://${req.headers.host}`)
+              url.searchParams.forEach((value, key) => {
+                params[key] = value
+              })
+
+              const connector = new ElFinderConnector(getSystemRoot())
+              const cmd = params.cmd || 'open'
+              const result = await connector.handle(cmd, params)
+
+              res.writeHead(200, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify(result))
+            } catch (err: any) {
+              res.writeHead(500)
+              res.end(JSON.stringify({ error: [err.message] }))
+            }
+          })()
+          return
+        }
+
+        // 处理POST请求
+        if (req.method === 'POST') {
+          const contentType = req.headers['content-type'] || ''
+
+          // 处理文件上传
+          if (contentType.includes('multipart/form-data')) {
+            const form = formidable({ multiples: true, uploadDir: require('os').tmpdir() })
+
+            form.parse(req, async (err: any, fields: any, files: any) => {
+              if (err) {
+                res.writeHead(500)
+                res.end(JSON.stringify({ error: ['Upload error'] }))
+                return
+              }
+
+              const params = { ...fields }
+
+              try {
+                if (params.cmd === 'upload' && files.upload) {
+                  const connector = new ElFinderConnector(getSystemRoot())
+                  const uploadFiles = Array.isArray(files.upload) ? files.upload : [files.upload]
+                  const added: any[] = []
+
+                  for (const file of uploadFiles) {
+                    const target = (connector as any).decode(params.target)
+                    const destPath = require('path').join(target, file.originalFilename || file.newFilename)
+                    await require('fs').promises.copyFile(file.filepath, destPath)
+                    await require('fs').promises.unlink(file.filepath)
+
+                    const fileInfo = await (connector as any).getFileInfo(destPath)
+                    if (fileInfo) added.push(fileInfo)
+                  }
+
+                  res.writeHead(200, { 'Content-Type': 'application/json' })
+                  res.end(JSON.stringify({ added }))
+                } else {
+                  const connector = new ElFinderConnector(getSystemRoot())
+                  const cmd = params.cmd || 'open'
+                  const result = await connector.handle(cmd, params)
+
+                  res.writeHead(200, { 'Content-Type': 'application/json' })
+                  res.end(JSON.stringify(result))
+                }
+              } catch (err: any) {
+                res.writeHead(500)
+                res.end(JSON.stringify({ error: [err.message] }))
+              }
+            })
+            return
+          } else {
+            // 普通POST数据
+            void readBody(req).then(async body => {
+              try {
+                const params = JSON.parse(body || '{}')
+                const connector = new ElFinderConnector(getSystemRoot())
+                const cmd = params.cmd || 'open'
+                const result = await connector.handle(cmd, params)
+
+                res.writeHead(200, { 'Content-Type': 'application/json' })
+                res.end(JSON.stringify(result))
+              } catch (err: any) {
+                res.writeHead(500)
+                res.end(JSON.stringify({ error: [err.message] }))
+              }
+            })
+            return
+          }
+        }
+
+        return
+      }
+
 
       // Configuration API
       if (pathname === '/api/config') {
@@ -363,7 +823,13 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
             'list.addMusicLocationType': global.lx.config['list.addMusicLocationType'],
             'proxy.enabled': global.lx.config['proxy.enabled'],
             'proxy.header': global.lx.config['proxy.header'],
+            'user.enablePath': global.lx.config['user.enablePath'],
+            'user.enableRoot': global.lx.config['user.enableRoot'],
             'frontend.password': global.lx.config['frontend.password'],
+            'webdav.url': global.lx.config['webdav.url'] || '',
+            'webdav.username': global.lx.config['webdav.username'] || '',
+            'webdav.password': global.lx.config['webdav.password'] || '',
+            'sync.interval': global.lx.config['sync.interval'] || 60,
           }
           res.writeHead(200, { 'Content-Type': 'application/json' })
           res.end(JSON.stringify(config))
@@ -379,14 +845,52 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
               if (newConfig['list.addMusicLocationType'] !== undefined) global.lx.config['list.addMusicLocationType'] = newConfig['list.addMusicLocationType']
               if (newConfig['proxy.enabled'] !== undefined) global.lx.config['proxy.enabled'] = newConfig['proxy.enabled']
               if (newConfig['proxy.header'] !== undefined) global.lx.config['proxy.header'] = newConfig['proxy.header']
+              if (newConfig['user.enablePath'] !== undefined) global.lx.config['user.enablePath'] = newConfig['user.enablePath']
+              // 新增：处理 user.enableRoot
+              if (newConfig['user.enableRoot'] !== undefined) global.lx.config['user.enableRoot'] = newConfig['user.enableRoot']
+
+              let warning = ''
+
+              // 校验：至少开启一种模式
+              if (!global.lx.config['user.enablePath'] && !global.lx.config['user.enableRoot']) {
+                // 如果都关闭了，强制开启根路径（或者报错，这里建议强制开启并警告）
+                global.lx.config['user.enableRoot'] = true
+                warning = '必须至少开启一种连接方式，已自动开启“根路径”模式。'
+              }
+
+              // 校验：如果开启了根路径，检查密码重复
+              if (global.lx.config['user.enableRoot']) {
+                const passwords = global.lx.config.users.map(u => u.password)
+                if (new Set(passwords).size !== passwords.length) {
+                  warning = warning ? warning + '\n' : ''
+                  warning += '检测到重复密码！开启“根路径”模式要求所有用户密码唯一，否则可能导致连接错误。'
+                }
+              }
               if (newConfig['frontend.password'] !== undefined) global.lx.config['frontend.password'] = newConfig['frontend.password']
 
-              // Save to config file
+              // WebDAV 配置
+              if (newConfig['webdav.url'] !== undefined) global.lx.config['webdav.url'] = newConfig['webdav.url']
+              if (newConfig['webdav.username'] !== undefined) global.lx.config['webdav.username'] = newConfig['webdav.username']
+              if (newConfig['webdav.password'] !== undefined) global.lx.config['webdav.password'] = newConfig['webdav.password']
+              if (newConfig['sync.interval'] !== undefined) global.lx.config['sync.interval'] = parseInt(newConfig['sync.interval'])
+
+              // 更新 WebDAVSync 配置
+              if (global.lx.webdavSync && (newConfig['webdav.url'] || newConfig['webdav.username'] || newConfig['webdav.password'] || newConfig['sync.interval'])) {
+                global.lx.webdavSync.updateConfig({
+                  url: global.lx.config['webdav.url'],
+                  username: global.lx.config['webdav.username'],
+                  password: global.lx.config['webdav.password'],
+                  interval: global.lx.config['sync.interval'],
+                })
+              }
+
               const configPath = path.join(process.cwd(), 'config.js')
               const configContent = `module.exports = ${JSON.stringify({
                 serverName: global.lx.config.serverName,
                 'proxy.enabled': global.lx.config['proxy.enabled'],
                 'proxy.header': global.lx.config['proxy.header'],
+                'user.enablePath': global.lx.config['user.enablePath'],
+                'user.enableRoot': global.lx.config['user.enableRoot'],
                 maxSnapshotNum: global.lx.config.maxSnapshotNum,
                 'list.addMusicLocationType': global.lx.config['list.addMusicLocationType'],
                 'frontend.password': global.lx.config['frontend.password'],
@@ -400,7 +904,7 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
               fs.writeFileSync(configPath, configContent)
 
               res.writeHead(200)
-              res.end(JSON.stringify({ success: true }))
+              res.end(JSON.stringify({ success: true, warning }))
             } catch (e) {
               res.writeHead(500)
               res.end('Server Error')
@@ -457,6 +961,283 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
         return
       }
 
+      // WebDAV Test Connection API
+      if (pathname === '/api/webdav/test' && req.method === 'POST') {
+        const auth = req.headers['x-frontend-auth']
+        if (auth !== global.lx.config['frontend.password']) {
+          res.writeHead(401)
+          res.end('Unauthorized')
+          return
+        }
+
+        const webdavSync = global.lx.webdavSync
+        if (!webdavSync) {
+          res.writeHead(500)
+          res.end(JSON.stringify({ success: false, message: 'WebDAV not initialized' }))
+          return
+        }
+
+        void webdavSync.testConnection().then((result: any) => {
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify(result))
+        })
+        return
+      }
+
+      // WebDAV Sync File API
+      if (pathname === '/api/webdav/sync-file' && req.method === 'POST') {
+        const auth = req.headers['x-frontend-auth']
+        if (auth !== global.lx.config['frontend.password']) {
+          res.writeHead(401)
+          res.end('Unauthorized')
+          return
+        }
+
+        void readBody(req).then(async body => {
+          try {
+            const { action, path: filePath } = JSON.parse(body)
+            const webdavSync = global.lx.webdavSync
+
+            if (!webdavSync) {
+              res.writeHead(500)
+              res.end(JSON.stringify({ success: false, message: 'WebDAV not initialized' }))
+              return
+            }
+
+            let success = false
+            if (action === 'upload') {
+              success = await webdavSync.uploadFile(filePath)
+            } else if (action === 'download') {
+              success = await webdavSync.downloadFile(filePath)
+            }
+
+            res.writeHead(200, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ success }))
+          } catch (err: any) {
+            res.writeHead(500)
+            res.end(JSON.stringify({ success: false, message: err.message }))
+          }
+        })
+        return
+      }
+
+      // WebDAV Backup API
+      if (pathname === '/api/webdav/backup' && req.method === 'POST') {
+        const auth = req.headers['x-frontend-auth']
+        if (auth !== global.lx.config['frontend.password']) {
+          res.writeHead(401)
+          res.end('Unauthorized')
+          return
+        }
+
+        const webdavSync = global.lx.webdavSync
+        if (!webdavSync) {
+          res.writeHead(500)
+          res.end(JSON.stringify({ success: false, message: 'WebDAV not initialized' }))
+          return
+        }
+
+        void webdavSync.uploadBackup().then((success: boolean) => {
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ success }))
+        })
+        return
+      }
+
+      // WebDAV Restore API
+      if (pathname === '/api/webdav/restore' && req.method === 'POST') {
+        const auth = req.headers['x-frontend-auth']
+        if (auth !== global.lx.config['frontend.password']) {
+          res.writeHead(401)
+          res.end('Unauthorized')
+          return
+        }
+
+        const webdavSync = global.lx.webdavSync
+        if (!webdavSync) {
+          res.writeHead(500)
+          res.end(JSON.stringify({ success: false, message: 'WebDAV not initialized' }))
+          return
+        }
+
+        void webdavSync.restoreFromRemote().then((success: boolean) => {
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ success }))
+        })
+        return
+      }
+
+      // WebDAV Logs API
+      if (pathname === '/api/webdav/logs' && req.method === 'GET') {
+        const auth = req.headers['x-frontend-auth']
+        if (auth !== global.lx.config['frontend.password']) {
+          res.writeHead(401)
+          res.end('Unauthorized')
+          return
+        }
+
+        const webdavSync = global.lx.webdavSync
+        if (!webdavSync) {
+          res.writeHead(404)
+          res.end(JSON.stringify({ logs: [] }))
+          return
+        }
+
+        const logs = webdavSync.getSyncLogs()
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ logs }))
+        return
+      }
+
+      // File Management - List Files
+      if (pathname === '/api/files' && req.method === 'GET') {
+        const auth = req.headers['x-frontend-auth']
+        if (auth !== global.lx.config['frontend.password']) {
+          res.writeHead(401)
+          res.end('Unauthorized')
+          return
+        }
+
+        const dirPath = urlObj.searchParams.get('path') || ''
+        const fullPath = path.join(global.lx.dataPath, dirPath)
+
+        // 安全检查：确保路径在 dataPath 内
+        if (!fullPath.startsWith(global.lx.dataPath)) {
+          res.writeHead(403)
+          res.end('Forbidden')
+          return
+        }
+
+        try {
+          const items = fs.readdirSync(fullPath).map(name => {
+            const itemPath = path.join(fullPath, name)
+            const stat = fs.statSync(itemPath)
+            return {
+              name,
+              path: path.relative(global.lx.dataPath, itemPath),
+              isDirectory: stat.isDirectory(),
+              size: stat.size,
+              mtime: stat.mtime.getTime(),
+            }
+          })
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ items }))
+        } catch (err: any) {
+          res.writeHead(500)
+          res.end(JSON.stringify({ error: err.message }))
+        }
+        return
+      }
+
+      // File Management - Download File
+      if (pathname === '/api/files/download' && req.method === 'GET') {
+        const auth = req.headers['x-frontend-auth']
+        if (auth !== global.lx.config['frontend.password']) {
+          res.writeHead(401)
+          res.end('Unauthorized')
+          return
+        }
+
+        const filePath = urlObj.searchParams.get('path') || ''
+        const fullPath = path.join(global.lx.dataPath, filePath)
+
+        if (!fullPath.startsWith(global.lx.dataPath)) {
+          res.writeHead(403)
+          res.end('Forbidden')
+          return
+        }
+
+        try {
+          const content = fs.readFileSync(fullPath)
+          res.writeHead(200, {
+            'Content-Type': 'application/octet-stream',
+            'Content-Disposition': `attachment; filename="${path.basename(fullPath)}"`,
+          })
+          res.end(content)
+        } catch (err) {
+          res.writeHead(404)
+          res.end('File not found')
+        }
+        return
+      }
+
+      // File Management - Create/Update File
+      if (pathname === '/api/files' && (req.method === 'POST' || req.method === 'PUT')) {
+        const auth = req.headers['x-frontend-auth']
+        if (auth !== global.lx.config['frontend.password']) {
+          res.writeHead(401)
+          res.end('Unauthorized')
+          return
+        }
+
+        void readBody(req).then(body => {
+          try {
+            const { path: filePath, content, isDirectory } = JSON.parse(body)
+            const fullPath = path.join(global.lx.dataPath, filePath)
+
+            if (!fullPath.startsWith(global.lx.dataPath)) {
+              res.writeHead(403)
+              res.end('Forbidden')
+              return
+            }
+
+            if (isDirectory) {
+              fs.mkdirSync(fullPath, { recursive: true })
+            } else {
+              const dir = path.dirname(fullPath)
+              if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true })
+              }
+              fs.writeFileSync(fullPath, content || '')
+            }
+
+            res.writeHead(200, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ success: true }))
+          } catch (err: any) {
+            res.writeHead(500)
+            res.end(JSON.stringify({ success: false, message: err.message }))
+          }
+        })
+        return
+      }
+
+      // File Management - Delete File
+      if (pathname === '/api/files' && req.method === 'DELETE') {
+        const auth = req.headers['x-frontend-auth']
+        if (auth !== global.lx.config['frontend.password']) {
+          res.writeHead(401)
+          res.end('Unauthorized')
+          return
+        }
+
+        void readBody(req).then(body => {
+          try {
+            const { path: filePath } = JSON.parse(body)
+            const fullPath = path.join(global.lx.dataPath, filePath)
+
+            if (!fullPath.startsWith(global.lx.dataPath)) {
+              res.writeHead(403)
+              res.end('Forbidden')
+              return
+            }
+
+            const stat = fs.statSync(fullPath)
+            if (stat.isDirectory()) {
+              fs.rmSync(fullPath, { recursive: true })
+            } else {
+              fs.unlinkSync(fullPath)
+            }
+
+            res.writeHead(200, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ success: true }))
+          } catch (err: any) {
+            res.writeHead(500)
+            res.end(JSON.stringify({ success: false, message: err.message }))
+          }
+        })
+        return
+      }
+
       res.writeHead(404)
       res.end('Not Found')
       return
@@ -467,15 +1248,58 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
     let msg
     switch (endUrl) {
       case '/hello':
+        // 新增：如果禁用了根路径，且当前访问的是根路径 (例如 /hello 而不是 /user/hello)，则拒绝
+        if (!global.lx.config['user.enableRoot']) {
+          const parts = pathname.split('/').filter(p => p)
+          // parts.length <= 1 说明没有用户名部分，只有 'hello'
+          if (parts.length <= 1) {
+            code = 403
+            msg = 'Root access disabled'
+            break
+          }
+        }
         code = 200
         msg = SYNC_CODE.helloMsg
         break
       case '/id':
+        // 新增：同上，对 /id 接口也进行同样的检查
+        if (!global.lx.config['user.enableRoot']) {
+          const parts = pathname.split('/').filter(p => p)
+          if (parts.length <= 1) {
+            code = 403
+            msg = 'Root access disabled'
+            break
+          }
+        }
+
         code = 200
         msg = SYNC_CODE.idPrefix + getServerId()
         break
       case '/ah':
-        void authCode(req, res, lx.config.users)
+        let targetUserName
+
+        // 1. 尝试匹配用户路径 /<userName>/ah
+        if (global.lx.config['user.enablePath']) {
+          const parts = pathname.split('/').filter(p => p)
+          // parts 应该是 ['username', 'ah']
+          if (parts.length > 1 && parts[parts.length - 1] === 'ah') {
+            targetUserName = decodeURIComponent(parts[parts.length - 2])
+          }
+        }
+
+        // 2. 如果没有匹配到用户名（说明是访问的根路径 /ah，或者 URL 格式不对）
+        if (!targetUserName) {
+          // 如果未开启根路径模式，则拒绝访问
+          if (!global.lx.config['user.enableRoot']) {
+            res.writeHead(403)
+            res.end('Access denied: Root path access is disabled. Please use /<username>/ah')
+            return
+          }
+          // 如果开启了根路径，targetUserName 保持 undefined，authCode 会遍历尝试所有用户
+        }
+
+        // 将 targetUserName 传递给 authCode
+        void authCode(req, res, lx.config.users, targetUserName)
         break
       default:
         // Serve static files
@@ -609,16 +1433,20 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
 
   httpServer.on('upgrade', function upgrade(request, socket, head) {
     socket.addListener('error', onSocketError)
-    // This function is not defined on purpose. Implement it with your own logic.
-    authConnection(request, err => {
-      if (err) {
-        console.log(err)
+
+    // 调用全局定义的 authConnection (在文件顶部约113行已经定义过)
+    authConnection(request, (err, success) => {
+      // 如果报错或者 success 为 false，则拒绝连接
+      if (err || !success) {
+        // console.log('Auth failed', err)
         socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
         socket.destroy()
         return
       }
+
       socket.removeListener('error', onSocketError)
 
+      // 鉴权通过，升级协议
       wss?.handleUpgrade(request, socket, head, function done(ws) {
         wss?.emit('connection', ws, request)
       })
@@ -751,4 +1579,3 @@ export const removeDevice = async (userName: string, clientId: string) => {
   const userSpace = getUserSpace(userName)
   await userSpace.removeDevice(clientId)
 }
-

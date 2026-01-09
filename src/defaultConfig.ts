@@ -3,6 +3,10 @@ const config: LX.Config = {
   serverName: 'My Sync Server', // 同步服务名称
   'proxy.enabled': false, // 是否使用代理转发请求到本服务器
   'proxy.header': 'x-real-ip', // 代理转发的请求头 原始IP
+  bindIP: '127.0.0.1', // 绑定IP
+  port: 9527, // 端口
+  'user.enablePath': true, // 是否开启用户路径
+  'user.enableRoot': false, // 是否开启根路径
 
   maxSnapshotNum: 10, // 公共最大备份快照数
   'list.addMusicLocationType': 'top', // 公共添加歌曲到我的列表时的位置 top | bottom，参考客户端的「设置 → 列表设置 → 添加歌曲到列表时的位置」
@@ -18,6 +22,12 @@ const config: LX.Config = {
   ],
 
   'frontend.password': '123456',
+
+  // WebDAV 配置
+  'webdav.url': '',
+  'webdav.username': '',
+  'webdav.password': '',
+  'sync.interval': 60, // 同步间隔（分钟）默认1小时
 }
 
 export default config

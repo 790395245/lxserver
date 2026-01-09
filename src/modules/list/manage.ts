@@ -12,7 +12,7 @@ export class ListManage {
     this.listDataManage = new ListDataManage(this.snapshotDataManage)
   }
 
-  createSnapshot = async() => {
+  createSnapshot = async () => {
     const listData = JSON.stringify(await this.getListData())
     const md5 = toMD5(listData)
     const snapshotInfo = await this.snapshotDataManage.getSnapshotInfo()
@@ -28,7 +28,7 @@ export class ListManage {
     return md5
   }
 
-  getCurrentListInfoKey = async() => {
+  getCurrentListInfoKey = async () => {
     const snapshotInfo = await this.snapshotDataManage.getSnapshotInfo()
     if (snapshotInfo.latest) return snapshotInfo.latest
     // snapshotInfo.latest = toMD5(JSON.stringify(await this.getListData()))
@@ -36,20 +36,37 @@ export class ListManage {
     return this.createSnapshot()
   }
 
-  getDeviceCurrentSnapshotKey = async(clientId: string) => {
+  getDeviceCurrentSnapshotKey = async (clientId: string) => {
     return this.snapshotDataManage.getDeviceCurrentSnapshotKey(clientId)
   }
 
-  updateDeviceSnapshotKey = async(clientId: string, key: string) => {
+  updateDeviceSnapshotKey = async (clientId: string, key: string) => {
     await this.snapshotDataManage.updateDeviceSnapshotKey(clientId, key)
   }
 
-  removeDevice = async(clientId: string) => {
+  removeDevice = async (clientId: string) => {
     this.snapshotDataManage.removeSnapshotInfo(clientId)
   }
 
-  getListData = async() => {
+  getListData = async () => {
     return await this.listDataManage.getListData()
+  }
+
+  getSnapshotList = async () => {
+    return this.snapshotDataManage.getSnapshotListWithMeta()
+  }
+
+  getSnapshot = async (name: string) => {
+    return this.snapshotDataManage.getSnapshot(name)
+  }
+
+  restoreSnapshot = async (name: string) => {
+    const listData = await this.snapshotDataManage.getSnapshot(name)
+    if (!listData) throw new Error('Snapshot not found')
+    await this.listDataManage.restore(listData)
+
+    this.snapshotDataManage.clearClients()
+    this.snapshotDataManage.setLatest(name)
   }
 }
 
