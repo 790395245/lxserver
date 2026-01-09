@@ -820,11 +820,21 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
               }
 
               const params = { ...fields }
-
+              // formidable v3 返回的值可能是数组，需要转换
+              for (const key in params) {
+                if (Array.isArray(params[key]) && params[key].length === 1) {
+                  params[key] = params[key][0]
+                }
+              }
+              console.log('[ElFinder] Files received:', Object.keys(files))
+              console.log('[ElFinder] Files detail:', files)
               try {
-                if (params.cmd === 'upload' && files.upload) {
+                // 获取上传的文件（字段名可能是 upload, upload[] 等）
+                const uploadedFiles = files.upload || files['upload[]'] || Object.values(files)[0]
+
+                if (params.cmd === 'upload' && uploadedFiles) {
                   const connector = new ElFinderConnector(getSystemRoot())
-                  const uploadFiles = Array.isArray(files.upload) ? files.upload : [files.upload]
+                  const uploadFiles = Array.isArray(uploadedFiles) ? uploadedFiles : [uploadedFiles]
                   const added: any[] = []
 
                   for (const file of uploadFiles) {
