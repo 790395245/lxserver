@@ -303,6 +303,32 @@ if (webdavSync.isConfigured()) {
   void webdavSync.restoreFromRemote().then((success: boolean) => {
     if (success) {
       console.log('Data restored from WebDAV successfully')
+      // 重新加载 users.json
+      const usersJsonPath = path.join(global.lx.dataPath, 'users.json')
+      if (fs.existsSync(usersJsonPath)) {
+        try {
+          const users = JSON.parse(fs.readFileSync(usersJsonPath, 'utf-8'))
+          if (Array.isArray(users)) {
+            console.log('Reload users from restored users.json')
+            global.lx.config.users = users.map(u => ({ ...u, dataPath: '' }))
+
+            // 重新初始化用户目录
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
+            const { getUserDirname } = require('@/user')
+            for (const user of global.lx.config.users) {
+              const dataPath = path.join(global.lx.userPath, getUserDirname(user.name))
+              checkAndCreateDir(dataPath)
+              user.dataPath = dataPath
+            }
+
+            console.log(`Users after WebDAV restore:
+${global.lx.config.users.map(user => `  ${user.name}: ${user.password}`).join('\n')}
+`)
+          }
+        } catch (err) {
+          console.error('Failed to reload users.json after WebDAV restore', err)
+        }
+      }
     }
     // 启动自动同步
     webdavSync.startAutoSync()

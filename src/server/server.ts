@@ -1203,7 +1203,26 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
         })
         return
       }
+      // Restart Server API
+      if (pathname === '/api/restart' && req.method === 'POST') {
+        const auth = req.headers['x-frontend-auth']
+        if (auth !== global.lx.config['frontend.password']) {
+          res.writeHead(401)
+          res.end('Unauthorized')
+          return
+        }
 
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ success: true, message: 'Server restarting...' }))
+
+        // 延迟1秒后重启
+        setTimeout(() => {
+          console.log('Server restarting by admin request...')
+          process.exit(0) // pm2 或其他进程管理器会自动重启
+        }, 1000)
+
+        return
+      }
       // File Management - List Files
       if (pathname === '/api/files' && req.method === 'GET') {
         const auth = req.headers['x-frontend-auth']

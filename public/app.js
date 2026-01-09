@@ -59,6 +59,10 @@ class App {
             });
         });
 
+        document.getElementById('restart-server-btn')?.addEventListener('click', () => {
+            this.restartServer()
+        })
+
         // 数据查看
         document.getElementById('refresh-data-btn')?.addEventListener('click', () => this.loadUserData());
         document.getElementById('data-user-select')?.addEventListener('change', () => this.loadUserData());
@@ -1574,7 +1578,6 @@ class App {
     }
 
     // ========== 初始化事件绑定 ==========
-    // 添加到 init() 方法中
 
     bindWebDAVEvents() {
         document.getElementById('test-webdav-btn')?.addEventListener('click', () => this.testWebDAV());
@@ -1692,6 +1695,26 @@ class App {
             this.loadDashboard(); // 刷新数据概览
         } catch (err) {
             alert('回滚失败: ' + err.message);
+        }
+    }
+    async restartServer() {
+        if (!confirm('确定要重启服务器吗？\n\n重启后所有连接的客户端将断开，大约需要几秒钟时间。')) {
+            return
+        }
+
+        try {
+            const result = await this.request('/api/restart', { method: 'POST' })
+            if (result.success) {
+                alert('服务器正在重启，请稍候...\n\n页面将在 5 秒后自动刷新。')
+                // 5秒后刷新页面
+                setTimeout(() => {
+                    window.location.reload()
+                }, 5000)
+            } else {
+                alert('重启失败: ' + (result.message || '未知错误'))
+            }
+        } catch (err) {
+            alert('重启请求失败: ' + err.message)
         }
     }
 }
