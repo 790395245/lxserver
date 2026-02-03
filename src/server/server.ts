@@ -11,6 +11,11 @@ import { getUserSpace, releaseUserSpace, getUserName, getServerId } from '@/user
 import { createMsg2call } from 'message2call'
 import { ElFinderConnector, getSystemRoot } from './elfinderConnector'
 import formidable from 'formidable'
+// @ts-ignore
+import musicSdkRaw from '@/modules/utils/musicSdk/index.js'
+const musicSdk = musicSdkRaw as any
+import { initUserApis, callUserApiGetMusicUrl, isSourceSupported, getLoadedApis } from './userApi'
+import * as customSourceHandlers from './customSourceHandlers'
 
 
 const getMime = (filename: string) => {
@@ -213,7 +218,22 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
     const urlObj = new URL(req.url ?? '', `http://${req.headers.host}`)
     const pathname = urlObj.pathname
 
+    // Serve Music Player Static Files
+    if (pathname.startsWith('/music')) {
+      // Defaults to index.html if exactly /music or /music/
+      let targetPath = pathname
+      if (pathname === '/music' || pathname === '/music/') {
+        targetPath = '/music/index.html'
+      }
+      // public/music/xxx
+      // global.lx.staticPath points to `public`
+      const filePath = path.join(global.lx.staticPath, targetPath)
+      serveStatic(req, res, filePath)
+      return
+    }
+
     if (pathname.startsWith('/api/')) {
+
 
       if (pathname === '/api/login' && req.method === 'POST') {
         void readBody(req).then(body => {
@@ -252,7 +272,12 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
           memory: process.memoryUsage().rss
         }
 
-        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        })
         res.end(JSON.stringify(status))
         return
       }
@@ -267,7 +292,10 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
         if (req.method === 'GET') {
           // 修改：返回包含密码的用户列表
           const users = global.lx.config.users.map(u => ({ name: u.name, password: u.password }))
-          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.writeHead(200, {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
+          })
           res.end(JSON.stringify(users))
           return
         }
@@ -423,7 +451,10 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
 
         const userSpace = getUserSpace(user)
         void userSpace.listManage.getListData().then(data => {
-          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.writeHead(200, {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
+          })
           res.end(JSON.stringify(data))
         }).catch(err => {
           res.writeHead(500)
@@ -447,7 +478,10 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
         }
         try {
           const list = await userSpace.listManage.getSnapshotList()
-          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.writeHead(200, {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
+          })
           res.end(JSON.stringify(list))
         } catch (err: any) {
           res.writeHead(500)
@@ -483,7 +517,10 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
             res.end('Not Found')
             return
           }
-          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.writeHead(200, {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
+          })
           res.end(JSON.stringify(data))
         } catch (err: any) {
           res.writeHead(500)
@@ -513,14 +550,76 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
 
           await userSpace.listManage.restoreSnapshot(id)
 
-          res.writeHead(200)
-          res.end('OK')
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ success: true }))
         } catch (err: any) {
           res.writeHead(500)
           res.end(err.message)
         }
         return
       }
+
+      // [新增] Batch Remove Songs from List (User Auth)
+      if (pathname === '/api/music/user/list/remove' && req.method === 'POST') {
+        const username = req.headers['x-user-name'] as string
+        const password = req.headers['x-user-password'] as string
+
+        if (!username || !password) {
+          res.writeHead(401)
+          res.end('需要用户认证')
+          return
+        }
+
+        const user = global.lx.config.users.find(u => u.name === username && u.password === password)
+        if (!user) {
+          res.writeHead(401)
+          res.end('用户名或密码错误')
+          return
+        }
+
+        void readBody(req).then(async body => {
+          try {
+            const { listId, songIds } = JSON.parse(body)
+
+            if (!listId || !Array.isArray(songIds)) {
+              res.writeHead(400)
+              res.end('参数错误:需要listId和songIds数组')
+              return
+            }
+
+            console.log(`[UserAPI] 批量删除请求: 用户=${username}, 列表=${listId}, 删除歌曲数=${songIds.length}`)
+            console.log(`[UserAPI] 待删除歌曲ID:`, songIds)
+
+            const userSpace = getUserSpace(username)
+
+            // Get list before deletion
+            const listBefore = await userSpace.listManage.listDataManage.getListMusics(listId)
+            console.log(`[UserAPI] 删除前列表歌曲数: ${listBefore.length}`)
+
+            // Remove songs from the list
+            const affectedLists = await userSpace.listManage.listDataManage.listMusicRemove(listId, songIds)
+            console.log(`[UserAPI] 受影响的列表:`, affectedLists)
+
+            // Get list after deletion  
+            const listAfter = await userSpace.listManage.listDataManage.getListMusics(listId)
+            console.log(`[UserAPI] 删除后列表歌曲数: ${listAfter.length}`)
+
+            // Create new snapshot to persist changes
+            const newSnapshotKey = await userSpace.listManage.createSnapshot()
+            console.log(`[UserAPI] 批量删除成功,已创建新快照: ${newSnapshotKey}`)
+
+            res.writeHead(200)
+            res.end('删除成功')
+          } catch (err: any) {
+            console.error('[UserAPI] 批量删除失败:', err)
+            res.writeHead(500)
+            res.end(err.message || '删除失败')
+          }
+        })
+        return
+      }
+
+
 
       // [新增] 删除快照 API
       if (pathname === '/api/data/delete-snapshot' && req.method === 'POST') {
@@ -544,8 +643,8 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
           // 调用刚刚在 ListManage 中添加的方法
           await userSpace.listManage.removeSnapshot(id)
 
-          res.writeHead(200)
-          res.end('OK')
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ success: true }))
         } catch (err: any) {
           res.writeHead(500)
           res.end(err.message)
@@ -589,8 +688,8 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
           // 调用 ListManage 中的 saveSnapshotWithTime 方法
           await userSpace.listManage.saveSnapshotWithTime(name, body, time)
 
-          res.writeHead(200)
-          res.end('OK')
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ success: true }))
         } catch (err: any) {
           res.writeHead(500)
           res.end(err.message)
@@ -598,7 +697,196 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
         return
       }
 
-      // 删除歌单
+      // [新增] User Login Verification
+      if (pathname === '/api/user/verify' && req.method === 'POST') {
+        void readBody(req).then(body => {
+          try {
+            const { username, password } = JSON.parse(body)
+            if (!username || !password) {
+              res.writeHead(400)
+              res.end('Missing username or password')
+              return
+            }
+            const user = global.lx.config.users.find(u => u.name === username && u.password === password)
+            if (user) {
+              res.writeHead(200, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify({ success: true }))
+            } else {
+              res.writeHead(401, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify({ success: false, message: 'Invalid credentials' }))
+            }
+          } catch (e) {
+            res.writeHead(400)
+            res.end('Bad Request')
+          }
+        })
+        return
+      }
+
+      // [新增] Get User List (User Auth)
+      if (pathname === '/api/user/list' && req.method === 'GET') {
+        const username = req.headers['x-user-name'] as string
+        const password = req.headers['x-user-password'] as string
+
+        if (!username || !password) {
+          res.writeHead(401)
+          res.end('Missing credentials')
+          return
+        }
+
+        const user = global.lx.config.users.find(u => u.name === username && u.password === password)
+        if (!user) {
+          res.writeHead(401)
+          res.end('Unauthorized')
+          return
+        }
+
+        const userSpace = getUserSpace(username)
+        void userSpace.listManage.getListData().then(data => {
+          res.writeHead(200, {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
+          })
+          res.end(JSON.stringify(data))
+        }).catch(err => {
+          res.writeHead(500)
+          res.end(err.message)
+        })
+        return
+      }
+
+      // [新增] Update User List (User Auth) - Full Restore/Overwrite
+      if (pathname === '/api/user/list' && req.method === 'POST') {
+        const username = req.headers['x-user-name'] as string
+        const password = req.headers['x-user-password'] as string
+
+        if (!username || !password) {
+          res.writeHead(401)
+          res.end('Missing credentials')
+          return
+        }
+
+        const user = global.lx.config.users.find(u => u.name === username && u.password === password)
+        if (!user) {
+          res.writeHead(401)
+          res.end('Unauthorized')
+          return
+        }
+
+        void readBody(req).then(async body => {
+          try {
+            const listData = JSON.parse(body)
+            const userSpace = getUserSpace(username)
+            // Restore ensures consistency with the provided snapshot
+            await userSpace.listManage.listDataManage.restore(listData)
+            // Create a snapshot after update
+            await userSpace.listManage.createSnapshot()
+
+            res.writeHead(200, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ success: true }))
+          } catch (err: any) {
+            res.writeHead(500)
+            res.end(err.message)
+          }
+        })
+        return
+      }
+
+      // [New] Fetch Lyrics
+      if (pathname === '/api/music/lyric' && req.method === 'GET') {
+        const source = urlObj.searchParams.get('source')
+        const songmid = urlObj.searchParams.get('songmid')
+
+        if (!source || !songmid) {
+          res.writeHead(400)
+          res.end('Missing source or songmid')
+          return
+        }
+
+        try {
+          if (!musicSdk[source]) {
+            throw new Error('Source not supported')
+          }
+
+          console.log('[Lyric] Fetching lyric for:', source, songmid)
+
+          // Construct complete songInfo object for SDK compatibility
+          // KuGou (kg) needs: name, hash, interval
+          // MiGu (mg) needs: copyrightId, lrcUrl, mrcUrl, trcUrl (优先，避免调用getMusicInfo API)
+          const songInfo = {
+            songmid,
+            name: urlObj.searchParams.get('name') || '',
+            singer: urlObj.searchParams.get('singer') || '',
+            hash: urlObj.searchParams.get('hash') || '',
+            interval: urlObj.searchParams.get('interval') || '',
+            copyrightId: urlObj.searchParams.get('copyrightId') || '',
+            albumId: urlObj.searchParams.get('albumId') || '',
+            lrcUrl: urlObj.searchParams.get('lrcUrl') || '',
+            mrcUrl: urlObj.searchParams.get('mrcUrl') || '',
+            trcUrl: urlObj.searchParams.get('trcUrl') || ''
+          }
+
+          const requestObj = musicSdk[source].getLyric(songInfo)
+          const lyricInfo = await requestObj.promise
+
+          res.writeHead(200, {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=86400' // Cache lyrics for 1 day
+          })
+          res.end(JSON.stringify(lyricInfo))
+        } catch (err: any) {
+          console.error('[Lyric] Fetch error:', source, songmid, err.message || err)
+
+          // Avoid circular structure error - only send message
+          res.writeHead(500, { 'Content-Type': 'text/plain' })
+          res.end(err.message || 'Failed to fetch lyric')
+        }
+        return
+      }
+
+      // [新增] Download Proxy API
+      if (pathname === '/api/music/download' && req.method === 'GET') {
+        const urlStr = urlObj.searchParams.get('url')
+        const filename = urlObj.searchParams.get('filename') || 'download.mp3'
+
+        if (!urlStr) {
+          res.writeHead(400)
+          res.end('Missing url param')
+          return
+        }
+
+        try {
+          console.log(`[DownloadProxy] Fetching: ${urlStr}`)
+
+          // Use needle or built-in http/https to fetch stream
+          const { get } = urlStr.startsWith('https') ? require('https') : require('http')
+
+          get(urlStr, (proxyRes: IncomingMessage) => {
+            // Forward headers (optional, but good for length/type)
+            const headers: Record<string, string | string[] | undefined> = {
+              'Content-Type': proxyRes.headers['content-type'] || 'application/octet-stream',
+              'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`
+            }
+            if (proxyRes.headers['content-length']) {
+              headers['Content-Length'] = proxyRes.headers['content-length']
+            }
+
+            res.writeHead(proxyRes.statusCode || 200, headers)
+            proxyRes.pipe(res)
+          }).on('error', (err: any) => {
+            console.error('[DownloadProxy] Request Error:', err)
+            res.writeHead(502)
+            res.end('Bad Gateway')
+          })
+
+        } catch (err: any) {
+          console.error('[DownloadProxy] Error:', err)
+          res.writeHead(500)
+          res.end('Server Error')
+        }
+        return
+      }
+
       if (pathname === '/api/data/delete-playlist' && req.method === 'POST') {
         const auth = req.headers['x-frontend-auth']
         if (auth !== global.lx.config['frontend.password']) {
@@ -781,24 +1069,25 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
             // 获取要删除的歌曲ID列表
             const songIds = songIndices.map((index: number) => {
               if (playlist.list && playlist.list[index]) {
-                return playlist.list[index].id
+                const id = playlist.list[index].id
+                return id
               }
               return null
             }).filter((id: any) => id !== null)
 
             if (songIds.length === 0) {
               res.writeHead(400)
-              res.end('No valid songs to delete')
+              res.end('No valid songs selected')
               return
             }
 
-            // 批量删除歌曲
+            // 批量删除
             await listManage.listDataManage.listMusicRemove(playlistId, songIds)
             // 创建快照
             await listManage.createSnapshot()
 
             res.writeHead(200, { 'Content-Type': 'application/json' })
-            res.end(JSON.stringify({ success: true, deletedCount: songIds.length }))
+            res.end(JSON.stringify({ success: true }))
           } catch (err: any) {
             res.writeHead(500)
             res.end(err.message)
@@ -806,6 +1095,232 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
         })
         return
       }
+
+      // [新增] Web播放器公共配置 API (无需鉴权)
+      if (pathname === '/api/music/config' && req.method === 'GET') {
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
+        })
+        res.end(JSON.stringify({
+          'player.enableAuth': global.lx.config['player.enableAuth'] || false
+        }))
+        return
+      }
+
+      // [新增] Web播放器认证 API
+      if (pathname === '/api/music/auth' && req.method === 'POST') {
+        void readBody(req).then(body => {
+          try {
+            const { password } = JSON.parse(body)
+            const correctPassword = global.lx.config['player.password'] || ''
+
+            if (password === correctPassword) {
+              res.writeHead(200, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify({ success: true, token: password }))
+            } else {
+              res.writeHead(200, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify({ success: false }))
+            }
+          } catch (err: any) {
+            res.writeHead(500)
+            res.end(JSON.stringify({ success: false, error: err.message }))
+          }
+        })
+        return
+      }
+
+      // [新增] Web播放器认证验证 API
+      if (pathname === '/api/music/auth/verify' && req.method === 'POST') {
+        void readBody(req).then(body => {
+          try {
+            const { token } = JSON.parse(body)
+            const correctPassword = global.lx.config['player.password'] || ''
+
+            res.writeHead(200, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ valid: token === correctPassword }))
+          } catch (err: any) {
+            res.writeHead(500)
+            res.end(JSON.stringify({ valid: false, error: err.message }))
+          }
+        })
+        return
+      }
+
+      // [新增] 音乐搜索 API
+      if (pathname === '/api/music/search' && req.method === 'GET') {
+        const name = urlObj.searchParams.get('name') || ''
+        const singer = urlObj.searchParams.get('singer') || ''
+        const source = urlObj.searchParams.get('source') || 'kw'
+        const limit = parseInt(urlObj.searchParams.get('limit') || '20')
+        const page = parseInt(urlObj.searchParams.get('page') || '1')
+
+        if (!name) {
+          res.writeHead(400); res.end('Missing name'); return
+        }
+
+        try {
+          if (!musicSdk[source]) {
+            throw new Error(`Source ${source} is not supported`)
+          }
+          const searchData = await musicSdk[source].musicSearch.search(name, page, limit)
+          const list = searchData.list || []
+
+          fs.appendFileSync(path.join(process.cwd(), 'debug.txt'), `[Search] Source: ${source}, Query: ${name}, Result Count: ${list.length}\n`)
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify(list))
+        } catch (err: any) {
+          fs.appendFileSync(path.join(process.cwd(), 'debug.txt'), `[Search Error] ${err.message}\n${err.stack}\n`)
+          console.error(err)
+          res.writeHead(500, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: err.message, code: 500 }))
+        }
+        return
+      }
+
+      // [新增] 音乐 URL API
+      if (pathname === '/api/music/url' && req.method === 'POST') {
+        void readBody(req).then(async body => {
+          try {
+            const { songInfo, quality } = JSON.parse(body)
+            if (!songInfo || !songInfo.source) {
+              throw new Error('Invalid songInfo')
+            }
+            const source = songInfo.source
+            let result
+
+            // 优先使用自定义源
+            if (isSourceSupported(source)) {
+              try {
+                console.log(`[MusicUrl] Using custom source for: ${source}`)
+                result = await callUserApiGetMusicUrl(source, songInfo, quality || '128k')
+              } catch (userApiError: any) {
+                console.error(`[MusicUrl] Custom source failed:`, userApiError.message)
+                // 不抛出错误，继续尝试内置源
+              }
+            }
+
+            // 回退到内置 musicSdk
+            if (!result) {
+              if (!musicSdk[source] || !musicSdk[source].getMusicUrl) {
+                throw new Error(`Source ${source} not supported`)
+              }
+              console.log(`[MusicUrl] Using built-in musicSdk for: ${source}`)
+              result = await musicSdk[source].getMusicUrl(songInfo, quality || '128k')
+            }
+
+            res.writeHead(200, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify(result))
+          } catch (err: any) {
+            console.error('[MusicUrl] Error:', err.message)
+            // [Fix] Return 500 but with specific error JSON to let frontend show detailed toast
+            res.writeHead(500, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ error: err.message, code: 500 }))
+          }
+        })
+        return
+      }
+
+      // [新增] 歌词 API
+      if (pathname === '/api/music/lyric' && req.method === 'POST') {
+        void readBody(req).then(async body => {
+          try {
+            const { songInfo } = JSON.parse(body)
+            if (!songInfo || !songInfo.source) {
+              throw new Error('Invalid songInfo')
+            }
+            const source = songInfo.source
+            if (!musicSdk[source] || !musicSdk[source].getLyric) {
+              throw new Error(`Source ${source} not supported`)
+            }
+            const result = await musicSdk[source].getLyric(songInfo)
+            res.writeHead(200, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify(result))
+          } catch (err: any) {
+            console.error(err)
+            res.writeHead(500)
+            res.end(err.message)
+          }
+        })
+        return
+      }
+
+      // [新增] 热搜 API
+      if (pathname === '/api/music/hotSearch' && req.method === 'GET') {
+        const source = urlObj.searchParams.get('source') || 'mg'
+
+        try {
+          // 检查是否支持热搜
+          if (!musicSdk[source] || !musicSdk[source].hotSearch) {
+            res.writeHead(404, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ error: '该音源不支持热搜功能' }))
+            return
+          }
+
+          console.log(`[HotSearch] 获取热搜: source=${source}`)
+          const result = await musicSdk[source].hotSearch.getList()
+
+          res.writeHead(200, {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=300' // 5分钟缓存
+          })
+          res.end(JSON.stringify(result))
+        } catch (err: any) {
+          console.error('[HotSearch] Error:', err.message)
+          res.writeHead(500, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: err.message || '获取热搜失败' }))
+        }
+        return
+      }
+
+
+      // [新增] 封面 API (备用)
+      if (pathname === '/api/music/pic' && req.method === 'POST') {
+        void readBody(req).then(async body => {
+          try {
+            const { songInfo } = JSON.parse(body)
+            if (!songInfo || !songInfo.source) {
+              throw new Error('Invalid songInfo')
+            }
+            const source = songInfo.source
+            if (!musicSdk[source] || !musicSdk[source].getPic) {
+              throw new Error(`Source ${source} not supported`)
+            }
+            const result = await musicSdk[source].getPic(songInfo)
+            res.writeHead(200, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify(result))
+          } catch (err: any) {
+            console.error(err)
+            res.writeHead(500)
+            res.end(err.message)
+          }
+        })
+        return
+      }
+
+      // [新增] 自定义源管理 API
+      if (pathname === '/api/custom-source/validate' && req.method === 'POST') {
+        return customSourceHandlers.handleValidate(req, res)
+      }
+      if (pathname === '/api/custom-source/import' && req.method === 'POST') {
+        return customSourceHandlers.handleImport(req, res)
+      }
+      if (pathname === '/api/custom-source/upload' && req.method === 'POST') {
+        return customSourceHandlers.handleUpload(req, res)
+      }
+      if (pathname === '/api/custom-source/list' && req.method === 'GET') {
+        const username = urlObj.searchParams.get('username') || 'default'
+        return customSourceHandlers.handleList(req, res, username)
+      }
+      if (pathname === '/api/custom-source/toggle' && req.method === 'POST') {
+        return customSourceHandlers.handleToggle(req, res)
+      }
+      if (pathname === '/api/custom-source/delete' && req.method === 'POST') {
+        return customSourceHandlers.handleDelete(req, res)
+      }
+
+
+
 
       // elFinder 文件管理器连接器
       if (pathname === '/api/elfinder/connector') {
@@ -986,12 +1501,17 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
             'user.enablePath': global.lx.config['user.enablePath'],
             'user.enableRoot': global.lx.config['user.enableRoot'],
             'frontend.password': global.lx.config['frontend.password'],
+            'player.enableAuth': global.lx.config['player.enableAuth'] || false,
+            'player.password': global.lx.config['player.password'] || '',
             'webdav.url': global.lx.config['webdav.url'] || '',
             'webdav.username': global.lx.config['webdav.username'] || '',
             'webdav.password': global.lx.config['webdav.password'] || '',
             'sync.interval': global.lx.config['sync.interval'] || 60,
           }
-          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.writeHead(200, {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
+          })
           res.end(JSON.stringify(config))
           return
         }
@@ -1028,6 +1548,10 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
               }
               if (newConfig['frontend.password'] !== undefined) global.lx.config['frontend.password'] = newConfig['frontend.password']
 
+              // Web播放器配置
+              if (newConfig['player.enableAuth'] !== undefined) global.lx.config['player.enableAuth'] = newConfig['player.enableAuth']
+              if (newConfig['player.password'] !== undefined) global.lx.config['player.password'] = newConfig['player.password']
+
               // WebDAV 配置
               if (newConfig['webdav.url'] !== undefined) global.lx.config['webdav.url'] = newConfig['webdav.url']
               if (newConfig['webdav.username'] !== undefined) global.lx.config['webdav.username'] = newConfig['webdav.username']
@@ -1054,6 +1578,8 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
                 maxSnapshotNum: global.lx.config.maxSnapshotNum,
                 'list.addMusicLocationType': global.lx.config['list.addMusicLocationType'],
                 'frontend.password': global.lx.config['frontend.password'],
+                'player.enableAuth': global.lx.config['player.enableAuth'],
+                'player.password': global.lx.config['player.password'],
                 users: global.lx.config.users.map(u => ({
                   name: u.name,
                   password: u.password,
@@ -1094,7 +1620,10 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
             return
           }
           const logLines = content.split('\n').slice(-lines)
-          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.writeHead(200, {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
+          })
           res.end(JSON.stringify({ logs: logLines }))
         })
         return
@@ -1116,7 +1645,10 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
           uptime: process.uptime(),
           memoryUsage: process.memoryUsage(),
         }
-        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate'
+        })
         res.end(JSON.stringify(stats))
         return
       }
@@ -1269,7 +1801,10 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
         }
 
         const logs = webdavSync.getSyncLogs()
-        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate'
+        })
         res.end(JSON.stringify({ logs }))
         return
       }
@@ -1312,7 +1847,19 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
         // 延迟1秒后重启
         setTimeout(() => {
           console.log('Server restarting by admin request...')
-          process.exit(0) // pm2 或其他进程管理器会自动重启
+          // 尝试通过更新文件时间戳触发 nodemon 重启
+          const entryFile = path.join(process.cwd(), 'src', 'index.ts')
+          try {
+            if (fs.existsSync(entryFile)) {
+              const time = new Date()
+              fs.utimesSync(entryFile, time, time)
+            } else {
+              process.exit(0)
+            }
+          } catch (err) {
+            console.error('Restart failed, forcing exit:', err)
+            process.exit(0)
+          }
         }, 1000)
 
         return
@@ -1348,7 +1895,10 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
               mtime: stat.mtime.getTime(),
             }
           })
-          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.writeHead(200, {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
+          })
           res.end(JSON.stringify({ items }))
         } catch (err: any) {
           res.writeHead(500)
@@ -1787,6 +2337,22 @@ export const startServer = async (port: number, ip: string) => {
   // if (status.status) await handleStopServer()
 
   startupLog.info(`starting sync server in ${process.env.NODE_ENV == 'production' ? 'production' : 'development'}`)
+  try {
+    await musicSdk.init()
+    startupLog.info('musicSdk initialized')
+  } catch (err) {
+    startupLog.error('musicSdk init failed:', err)
+  }
+
+  // 初始化自定义源
+  try {
+    console.log('[Server] Initializing custom user APIs...')
+    await initUserApis('default')
+    console.log('[Server] Custom user APIs initialized')
+  } catch (err: any) {
+    console.error('[Server] Failed to initialize user APIs:', err.message)
+  }
+
   await handleStartServer(port, ip).then(() => {
     // console.log('sync server started')
     status.status = true

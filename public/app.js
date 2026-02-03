@@ -207,6 +207,9 @@ class App {
                 // 跳转到新的 elFinder 文件管理器
                 window.location.href = '/filemanager.html';
                 return;
+            case 'music':
+                window.location.href = '/music';
+                return;
         }
     }
 
@@ -712,7 +715,7 @@ class App {
             `;
             content += '<div class="songs-table">';
             content += `
-                <div class="songs-table-header">
+                <div class="songs-table-header with-checkbox">
                     <div class="song-col-checkbox">
                         <input type="checkbox" id="select-all-checkbox" onchange="app.toggleAllSongs(this.checked)">
                     </div>
@@ -720,22 +723,20 @@ class App {
                     <div class="song-col-name">歌曲</div>
                     <div class="song-col-artist">歌手</div>
                     <div class="song-col-album">专辑</div>
-                    <div class="song-col-source">来源</div>
                     <div class="song-col-actions">操作</div>
                 </div>
             `;
 
             playlist.list.forEach((song, songIndex) => {
                 content += `
-                    <div class="song-row">
+                    <div class="song-row with-checkbox">
                         <div class="song-col-checkbox">
                             <input type="checkbox" class="song-checkbox" data-index="${songIndex}" onchange="app.updateBatchDeleteBtn()">
                         </div>
                         <div class="song-col-index">${songIndex + 1}</div>
-                        <div class="song-col-name">${this.escapeHtml(song.name || '未知歌曲')}</div>
+                        ${this.renderSongNameCell(song)}
                         <div class="song-col-artist">${this.escapeHtml(song.singer || '未知歌手')}</div>
                         <div class="song-col-album">${this.escapeHtml(song.albumName || '-')}</div>
-                        <div class="song-col-source">${this.escapeHtml(song.source || '-')}</div>
                         <div class="song-col-actions">
                             <button class="btn-delete-song" onclick="app.deleteSong(${index}, ${songIndex})" title="删除歌曲">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -871,10 +872,9 @@ class App {
                 content += `
                     <div class="song-row">
                         <div class="song-col-index">${songIndex + 1}</div>
-                        <div class="song-col-name">${this.escapeHtml(song.name || '未知歌曲')}</div>
+                        ${this.renderSongNameCell(song)}
                         <div class="song-col-artist">${this.escapeHtml(song.singer || '未知歌手')}</div>
                         <div class="song-col-album">${this.escapeHtml(song.albumName || '-')}</div>
-                        <div class="song-col-source">${this.escapeHtml(song.source || '-')}</div>
                         <div class="song-col-actions">
                             <button class="btn-delete-song" onclick="app.deleteSong('${listType}', ${songIndex})" title="删除歌曲">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1138,7 +1138,6 @@ class App {
                     <div class="song-col-name">歌曲</div>
                     <div class="song-col-artist">歌手</div>
                     <div class="song-col-album">专辑</div>
-                    <div class="song-col-source">来源</div>
                     <div class="song-col-playlist">所属列表</div>
                 </div>
             `;
@@ -1147,10 +1146,9 @@ class App {
                 content += `
                     <div class="song-row">
                         <div class="song-col-index">${songIndex + 1}</div>
-                        <div class="song-col-name" title="${this.escapeHtml(song.name || '未知歌曲')}">${this.escapeHtml(song.name || '未知歌曲')}</div>
+                        ${this.renderSongNameCell(song)}
                         <div class="song-col-artist" title="${this.escapeHtml(song.singer || '未知歌手')}">${this.escapeHtml(song.singer || '未知歌手')}</div>
                         <div class="song-col-album" title="${this.escapeHtml(song.albumName || '-')}">${this.escapeHtml(song.albumName || '-')}</div>
-                        <div class="song-col-source">${this.escapeHtml(song.source || '-')}</div>
                         <div class="song-col-playlist">${this.escapeHtml(song._source)}</div>
                     </div>
                 `;
@@ -1182,6 +1180,14 @@ class App {
             }
             form.elements['frontend.password'].value = config['frontend.password'] || '';
 
+            // Web播放器配置
+            if (form.elements['player.enableAuth']) {
+                form.elements['player.enableAuth'].checked = config['player.enableAuth'] === true;
+            }
+            if (form.elements['player.password']) {
+                form.elements['player.password'].value = config['player.password'] || '';
+            }
+
             // WebDAV 配置
             if (form.elements['webdav.url']) {
                 form.elements['webdav.url'].value = config['webdav.url'] || '';
@@ -1212,6 +1218,8 @@ class App {
             'user.enablePath': formData.get('user.enablePath') === 'on',
             'user.enableRoot': formData.get('user.enableRoot') === 'on',
             'frontend.password': formData.get('frontend.password'),
+            'player.enableAuth': formData.get('player.enableAuth') === 'on',
+            'player.password': formData.get('player.password'),
             'webdav.url': formData.get('webdav.url'),
             'webdav.username': formData.get('webdav.username'),
             'webdav.password': formData.get('webdav.password'),
@@ -1409,6 +1417,70 @@ class App {
         if (bar) bar.style.width = `${percent}%`;
         if (textEl) textEl.textContent = text;
         if (percentEl) percentEl.textContent = `${Math.round(percent)}%`;
+    }
+
+    // 辅助方法：生成歌曲标签 HTML
+    renderSongTags(song) {
+        let html = '<div class="song-meta-tags">';
+
+        // 来源标签
+        if (song.source) {
+            html += `<span class="tag tag-source ${song.source}">${this.escapeHtml(song.source)}</span>`;
+        }
+
+        // 音质标签
+        if (song.meta && song.meta._qualitys) {
+            const qualitys = song.meta._qualitys;
+            // 优先显示最高音质
+            if (qualitys.flac24bit) {
+                html += '<span class="tag tag-quality hr">Hi-Res</span>';
+            } else if (qualitys.flac) {
+                html += '<span class="tag tag-quality lossless">SQ</span>';
+            } else if (qualitys['320k']) {
+                html += '<span class="tag tag-quality high">HQ</span>';
+            } else if (qualitys['128k']) {
+                // 128k 一般不显示标签，或者显示 standard
+                // html += '<span class="tag tag-quality">PQ</span>';
+            }
+        } else if (song.meta && song.meta.qualitys) { // 兼容旧结构 array
+            const qualitys = song.meta.qualitys;
+            if (qualitys.some(q => q.type === 'flac24bit')) {
+                html += '<span class="tag tag-quality hr">Hi-Res</span>';
+            } else if (qualitys.some(q => q.type === 'flac')) {
+                html += '<span class="tag tag-quality lossless">SQ</span>';
+            } else if (qualitys.some(q => q.type === '320k')) {
+                html += '<span class="tag tag-quality high">HQ</span>';
+            }
+        }
+
+        // 时长
+        if (song.interval) {
+            html += `<span class="tag tag-interval">${this.escapeHtml(song.interval)}</span>`;
+        }
+
+        html += '</div>';
+        return html;
+    }
+
+    // 辅助方法：生成歌曲名称列 HTML（包含封面）
+    renderSongNameCell(song) {
+        const picUrl = song.meta?.picUrl || '';
+        // 使用默认图占位，data-src 用于懒加载 (IntersectionObserver 稍后实现，这里直接用原生 lazy loading)
+        // 注意：Web 原生 loading="lazy" 对 background-image 无效，对 img 标签有效。
+        // 这里使用 img 标签
+        const coverHtml = picUrl
+            ? `<img src="${picUrl}" class="song-cover" loading="lazy" alt="cover" onerror="this.style.opacity=0">`
+            : `<div class="song-cover" style="background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center;">🎵</div>`;
+
+        return `
+            <div class="song-col-name">
+                ${coverHtml}
+                <div class="song-info-wrapper">
+                    <span class="song-title-text" title="${this.escapeHtml(song.name)}">${this.escapeHtml(song.name || '未知歌曲')}</span>
+                    ${this.renderSongTags(song)}
+                </div>
+            </div>
+        `;
     }
 
     initSSE() {

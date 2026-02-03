@@ -2,6 +2,13 @@
 
 import fs from 'fs'
 import path from 'path'
+import moduleAlias from 'module-alias'
+moduleAlias.addAliases({
+  '@common': path.join(__dirname, 'common'),
+  '@renderer': path.join(__dirname, 'modules'),
+  '@': __dirname
+})
+
 import { initLogger } from '@/utils/log4js'
 import defaultConfig from './defaultConfig'
 import { ENV_PARAMS, File } from './constants'
@@ -9,6 +16,14 @@ import { checkAndCreateDirSync } from './utils'
 
 type ENV_PARAMS_Type = typeof ENV_PARAMS
 type ENV_PARAMS_Value_Type = ENV_PARAMS_Type[number]
+
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err)
+})
+process.on('unhandledRejection', (reason, p) => {
+  console.error('Unhandled Rejection at:', p, 'reason:', reason)
+})
 
 let envParams: Partial<Record<Exclude<ENV_PARAMS_Value_Type, 'LX_USER_'>, string>> = {}
 let envUsers: LX.User[] = []
@@ -45,6 +60,7 @@ global.lx = {
   dataPath,
   userPath: path.join(dataPath, File.userDir),
   config: defaultConfig,
+  staticPath: path.join(process.cwd(), 'public'),
 }
 
 const mergeConfigFileEnv = (config: Partial<Record<ENV_PARAMS_Value_Type, string>>) => {
@@ -152,6 +168,12 @@ if (envParams.PORT) {
 }
 if (envParams.BIND_IP) {
   global.lx.config.bindIP = envParams.BIND_IP
+}
+if (envParams.ENABLE_WEBPLAYER_AUTH) {
+  global.lx.config['player.enableAuth'] = envParams.ENABLE_WEBPLAYER_AUTH === 'true'
+}
+if (envParams.WEBPLAYER_PASSWORD) {
+  global.lx.config['player.password'] = envParams.WEBPLAYER_PASSWORD
 }
 
 if (envUsers.length) {

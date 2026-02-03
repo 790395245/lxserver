@@ -23,6 +23,7 @@
   - 支持从 WebDAV 云端恢复数据。
 - **文件管理器**：内置简易文件管理器，方便管理服务器上的日志和配置文件。
 - **灵活配置**：支持通过 Web 界面修改系统配置（端口、代理、密码等），无需手动编辑文件。
+- **[Web 播放器](md/WEBPLAYER.md)**：内置功能强大的 Web 端音乐播放器，支持多源搜索、歌单同步、歌词显示等，随时随地享受音乐。
 
 ## 🚀 快速开始
 
@@ -57,7 +58,7 @@ docker build -t lx-music-sync-server .
 
 # 运行容器
 docker run -d \
-  -p 9999:9999 \
+  -p 9527:9527 \
   -v $(pwd)/data:/app/data \
   -v $(pwd)/logs:/app/logs \
   --name lx-sync-server \
@@ -68,11 +69,9 @@ docker run -d \
 
 服务启动后，打开浏览器访问：
 
-```
-http://localhost:9999
-```
+http://localhost:9527
 
-- **默认端口**：`9999` (可在 `config.js` 中修改)
+- **默认端口**：`9527` (可在 `config.js` 中修改)
 - **默认管理密码**：`123456`
 
 > ⚠️ **注意**：首次登录后，请务必在“系统配置”中修改前端访问密码！
@@ -85,18 +84,20 @@ http://localhost:9999
 
 支持使用环境变量覆盖 `config.js` 中的配置（Docker 部署时非常有用）：
 
-| 环境变量              | 对应配置项            | 说明                              | 默认值             |
-| --------------------- | --------------------- | --------------------------------- | ------------------ |
-| `PORT`              | `port`              | 服务端口                          | `9527`           |
-| `BIND_IP`           | `bindIP`            | 绑定 IP                           | `0.0.0.0`        |
-| `FRONTEND_PASSWORD` | `frontend.password` | Web 管理界面访问密码              | `123456`         |
-| `SERVER_NAME`       | `serverName`        | 同步服务名称                      | `My Sync Server` |
-| `MAX_SNAPSHOT_NUM`  | `maxSnapshotNum`    | 保留的最大快照数量                | `10`             |
-| `PROXY_HEADER`      | `proxy.header`      | 代理转发 IP 头 (如 `x-real-ip`) | -                  |
-| `WEBDAV_URL`        | `webdav.url`        | WebDAV 地址                       | -                  |
-| `WEBDAV_USERNAME`   | `webdav.username`   | WebDAV 用户名                     | -                  |
-| `WEBDAV_PASSWORD`   | `webdav.password`   | WebDAV 密码                       | -                  |
-| `SYNC_INTERVAL`     | `sync.interval`     | WebDAV 自动备份间隔(分钟)         | `60`             |
+| 环境变量                  | 对应配置项            | 说明                              | 默认值             |
+| ------------------------- | --------------------- | --------------------------------- | ------------------ |
+| `PORT`                  | `port`              | 服务端口                          | `9527`           |
+| `BIND_IP`               | `bindIP`            | 绑定 IP                           | `0.0.0.0`        |
+| `FRONTEND_PASSWORD`     | `frontend.password` | Web 管理界面访问密码              | `123456`         |
+| `SERVER_NAME`           | `serverName`        | 同步服务名称                      | `My Sync Server` |
+| `MAX_SNAPSHOT_NUM`      | `maxSnapshotNum`    | 保留的最大快照数量                | `10`             |
+| `PROXY_HEADER`          | `proxy.header`      | 代理转发 IP 头 (如 `x-real-ip`) | -                  |
+| `WEBDAV_URL`            | `webdav.url`        | WebDAV 地址                       | -                  |
+| `WEBDAV_USERNAME`       | `webdav.username`   | WebDAV 用户名                     | -                  |
+| `WEBDAV_PASSWORD`       | `webdav.password`   | WebDAV 密码                       | -                  |
+| `SYNC_INTERVAL`         | `sync.interval`     | WebDAV 自动备份间隔(分钟)         | `60`             |
+| `ENABLE_WEBPLAYER_AUTH` | `player.enableAuth` | 是否启用 Web 播放器访问密码       | `false`          |
+| `WEBPLAYER_PASSWORD`    | `player.password`   | Web 播放器访问密码                | 123456             |
 
 ### 用户配置
 

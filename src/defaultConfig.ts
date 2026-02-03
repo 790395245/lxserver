@@ -28,6 +28,10 @@ const config: LX.Config = {
   'webdav.username': '',
   'webdav.password': '',
   'sync.interval': 60, // 同步间隔（分钟）默认1小时
+
+  // Web播放器配置
+  'player.enableAuth': false,
+  'player.password': '123456',
 }
 
 export default config

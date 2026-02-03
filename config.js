@@ -68,5 +68,13 @@ module.exports = {
 
   // 同步间隔 (分钟)
   // 环境变量: SYNC_INTERVAL
-  "sync.interval": 60
+  "sync.interval": 60,
+
+  // 是否启用 Web播放器 访问密码
+  // 环境变量: ENABLE_WEBPLAYER_AUTH (true/false)
+  "player.enableAuth": false,
+
+  // Web播放器 访问密码
+  // 环境变量: WEBPLAYER_PASSWORD
+  "player.password": "123456"
 }

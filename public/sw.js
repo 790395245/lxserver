@@ -21,6 +21,15 @@ self.addEventListener('fetch', (event) => {
     if (event.request.method !== 'GET') return;
     if (!event.request.url.startsWith('http')) return;
 
+    // [Fix] Do not cache API requests
+    if (event.request.url.includes('/api/')) return;
+    // [Fix] Do not cache Music Player files (dev mode)
+    if (event.request.url.includes('/music/')) return;
+
+    // [Fix] Do not cache external resources (CDN, placeholders, etc.)
+    const url = new URL(event.request.url);
+    if (url.origin !== location.origin) return;
+
     event.respondWith(
         caches.match(event.request).then((cachedResponse) => {
             // Return cached response if found
@@ -43,6 +52,14 @@ self.addEventListener('fetch', (event) => {
                 });
 
                 return response;
+            }).catch((error) => {
+                // Network fetch failed, log and return error
+                console.error('[SW] Fetch failed:', event.request.url, error);
+                // Return a basic error response instead of throwing
+                return new Response('Network error', {
+                    status: 408,
+                    statusText: 'Request Timeout'
+                });
             });
         })
     );

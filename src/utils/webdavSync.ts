@@ -4,6 +4,7 @@ import archiver from 'archiver'
 import { Extract } from 'unzipper'
 import crypto from 'crypto'
 import { EventEmitter } from 'events'
+import { PassThrough } from 'stream'
 
 interface WebDAVConfig {
     url: string
@@ -136,17 +137,27 @@ class WebDAVSync extends EventEmitter {
             const remoteDir = path.dirname(remotePath)
             await this.client.createDirectory(remoteDir, { recursive: true })
 
-            const content = fs.readFileSync(localPath)
+            // 使用流式上传并监控进度
+            const readStream = fs.createReadStream(localPath)
+            const passThrough = new PassThrough()
+            let uploadedBytes = 0
 
-            this.emit('progress', {
-                type: 'file',
-                status: 'uploading',
-                file: relativePath,
-                current: 0,
-                total: stat.size
+            passThrough.on('data', (chunk) => {
+                uploadedBytes += chunk.length
+                // 限制进度事件触发频率，例如每 1% 或每 100ms 触发一次，这里简单处理
+                // 如果文件很小，可能瞬间完成
+                this.emit('progress', {
+                    type: 'file',
+                    status: 'uploading',
+                    file: relativePath,
+                    current: uploadedBytes,
+                    total: stat.size
+                })
             })
 
-            await this.client.putFileContents(remotePath, content)
+            readStream.pipe(passThrough)
+
+            await this.client.putFileContents(remotePath, passThrough)
 
             this.emit('progress', {
                 type: 'file',
@@ -279,18 +290,34 @@ class WebDAVSync extends EventEmitter {
 
             const zipPath = path.join(this.dataPath, zipName)
             const stat = fs.statSync(zipPath)
-            const content = fs.readFileSync(zipPath)
             const remotePath = `/lx-sync-backups/${zipName}`
 
-            this.emit('progress', {
-                type: 'backup',
-                status: 'uploading',
-                file: zipName,
-                total: stat.size,
-                current: 0
+            // 使用流式上传并监控进度
+            const readStream = fs.createReadStream(zipPath)
+            const passThrough = new PassThrough()
+            let uploadedBytes = 0
+
+            // 节流控制，避免发送过多 SSE 消息
+            let lastProgressTime = 0
+
+            passThrough.on('data', (chunk) => {
+                uploadedBytes += chunk.length
+                const now = Date.now()
+                if (now - lastProgressTime > 100 || uploadedBytes === stat.size) { // 至少间隔100ms
+                    this.emit('progress', {
+                        type: 'backup',
+                        status: 'uploading',
+                        file: zipName,
+                        total: stat.size,
+                        current: uploadedBytes
+                    })
+                    lastProgressTime = now
+                }
             })
 
-            await this.client.putFileContents(remotePath, content)
+            readStream.pipe(passThrough)
+
+            await this.client.putFileContents(remotePath, passThrough)
 
             this.emit('progress', {
                 type: 'backup',
@@ -300,18 +327,27 @@ class WebDAVSync extends EventEmitter {
                 current: stat.size
             })
 
-            // 清理本地zip
-            fs.unlinkSync(zipPath)
-
-            // 清理旧备份（保留最近5个）
-            await this.cleanOldBackups()
-
+            // 记录成功日志
             this.addLog({
                 timestamp: Date.now(),
                 type: 'backup',
                 file: zipName,
                 status: 'success',
             })
+
+            // 清理本地zip
+            try {
+                fs.unlinkSync(zipPath)
+            } catch (e) {
+                console.error('Failed to cleanup local backup zip:', e)
+            }
+
+            // 清理旧备份（保留最近5个）
+            try {
+                await this.cleanOldBackups()
+            } catch (e) {
+                console.error('Failed to clean old remote backups:', e)
+            }
 
             return true
         } catch (err: any) {

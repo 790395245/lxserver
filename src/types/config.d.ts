@@ -106,6 +106,16 @@ declare namespace LX {
      * 同步间隔(分钟)
      */
     'sync.interval'?: number
+
+    /**
+     * 是否开启Web播放器访问密码
+     */
+    'player.enableAuth'?: boolean
+
+    /**
+     * Web播放器访问密码
+     */
+    'player.password'?: string
   }
 }
 

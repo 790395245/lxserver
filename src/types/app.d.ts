@@ -8,6 +8,7 @@ declare global {
     userPath: string
     config: LX.Config
     webdavSync?: any  // WebDAVSync instance
+    staticPath: string
   }
 
   // var envParams: LX.EnvParams

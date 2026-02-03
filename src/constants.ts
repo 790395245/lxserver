@@ -14,6 +14,8 @@ export const ENV_PARAMS = [
   'SYNC_INTERVAL',
   'USER_ENABLE_PATH',
   'USER_ENABLE_ROOT',
+  'ENABLE_WEBPLAYER_AUTH',
+  'WEBPLAYER_PASSWORD',
   'LX_USER_',
 ] as const
 
