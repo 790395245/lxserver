@@ -14,7 +14,9 @@ let settings = {
     itemsPerPage: 20, // Default 20 items per page, can be 'all'
     itemsPerPage: 20, // Default 20 items per page, can be 'all'
     preferredQuality: '320k', // 默认音质偏好
-    enablePublicSources: true // 是否显示公开源
+    enablePublicSources: true, // 是否显示公开源
+    enableProxyPlayback: false, // 播放音乐代理
+    enableProxyDownload: false // 下载音乐代理
 };
 
 // 从 localStorage 加载设置
@@ -162,11 +164,32 @@ checkAuth();
 
 // 音质选择器初始化
 document.addEventListener('DOMContentLoaded', () => {
+    // 音质选择器初始化
     const qualitySelect = document.getElementById('quality-select');
     if (qualitySelect && settings.preferredQuality) {
         qualitySelect.value = settings.preferredQuality;
     }
+
+    // Initialize Proxy Settings UI
+    const proxyPlayback = document.getElementById('toggle-proxy-playback');
+    if (proxyPlayback) proxyPlayback.checked = settings.enableProxyPlayback;
+
+    const proxyDownload = document.getElementById('toggle-proxy-download');
+    if (proxyDownload) proxyDownload.checked = settings.enableProxyDownload;
 });
+
+// 切换代理设置
+function changeProxyPlayback(enabled) {
+    settings.enableProxyPlayback = enabled;
+    localStorage.setItem('lx_settings', JSON.stringify(settings));
+    console.log(`[Settings] Proxy Playback: ${enabled}`);
+}
+
+function changeProxyDownload(enabled) {
+    settings.enableProxyDownload = enabled;
+    localStorage.setItem('lx_settings', JSON.stringify(settings));
+    console.log(`[Settings] Proxy Download: ${enabled}`);
+}
 
 // 切换音质偏好
 function changeQualityPreference(quality) {
@@ -823,15 +846,29 @@ function lazyLoadImages() {
 
 
 // Playback Logic
+let currentLoadingSongId = null; // Track currently loading song
 
 let currentQuality = '128k'; // 当前播放音质
 let hintTimeout = null;
 
 async function playSong(song, index, forceQuality = null) {
+    // 1. Debounce / Lock: If already loading this song, ignore click
+    if (currentLoadingSongId === song.id) {
+        console.log(`[Player] Already loading ${song.name}, ignoring request.`);
+        return;
+    }
+
+    // 2. New Song Request: Update target
+    const thisRequestSongId = song.id;
+    currentLoadingSongId = thisRequestSongId;
+
     currentIndex = index;
     currentPlayingSong = song;
     updatePlayerInfo(song);
     updateMediaSessionMetadata(song);
+
+    // Show persistent loading toast
+    showInfo(`正在加载: ${song.name}...`);
 
     // 处理切换提示的显示与隐藏
     const hint = document.getElementById('toggle-hint');
@@ -876,6 +913,12 @@ async function playSong(song, index, forceQuality = null) {
             body: JSON.stringify({ songInfo: song, quality })
         });
 
+        // 3. Stale Check: If user switched song while fetching, discard result
+        if (currentLoadingSongId !== thisRequestSongId) {
+            console.log(`[Player] Discarding stale result for ${song.name} (Now loading: ${currentLoadingSongId})`);
+            return;
+        }
+
         if (!res.ok) {
             // [Improvement] Try to get detailed error JSON from server
             let errorMsg = `HTTP ${res.status}`;
@@ -889,7 +932,18 @@ async function playSong(song, index, forceQuality = null) {
         const result = await res.json();
 
         if (result.url) {
-            audio.src = result.url;
+            let finalUrl = result.url;
+
+            // Apply Proxy Setting logic
+            if (settings.enableProxyPlayback) {
+                // Wrap in proxy if not already wrapped
+                if (!finalUrl.startsWith('/api/music/download')) {
+                    const filename = `${song.singer} - ${song.name}.mp3`;
+                    finalUrl = `/api/music/download?url=${encodeURIComponent(result.url)}&filename=${encodeURIComponent(filename)}&inline=1`;
+                }
+            }
+
+            audio.src = finalUrl;
 
             // 尝试播放
             try {
@@ -910,6 +964,9 @@ async function playSong(song, index, forceQuality = null) {
             throw new Error('服务器未返回播放链接');
         }
     } catch (error) {
+        // Stale Check in error
+        if (currentLoadingSongId !== thisRequestSongId) return;
+
         console.error('[Player] 播放失败:', error);
 
         const isSourceError = error.message.includes('自定义源') || error.message.includes('not supported');
@@ -921,6 +978,9 @@ async function playSong(song, index, forceQuality = null) {
         if (canRetry) {
             console.log(`[Player] 尝试降级到 ${nextQuality} 重试...`);
             setPlayerStatus(`播放失败，尝试降级到 ${window.QualityManager.getQualityDisplayName(nextQuality)}...`);
+
+            // Allow retry to proceed as new request
+            currentLoadingSongId = null;
 
             setTimeout(() => {
                 playSong(song, index, nextQuality);
@@ -941,6 +1001,11 @@ async function playSong(song, index, forceQuality = null) {
                     playNext();
                 }
             }, 2000);
+        }
+        updatePlayButton(false);
+    } finally {
+        if (currentLoadingSongId === thisRequestSongId) {
+            currentLoadingSongId = null;
         }
     }
 }
@@ -1498,6 +1563,8 @@ window.handleHotSearchClick = handleHotSearchClick;
 window.playSong = playSong;
 window.togglePlay = togglePlay;
 window.playNext = playNext;
+window.changeProxyPlayback = changeProxyPlayback;
+window.changeProxyDownload = changeProxyDownload;
 window.playPrev = playPrev;
 window.seek = seek;
 // 音量控制

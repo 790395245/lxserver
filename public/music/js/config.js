@@ -1,3 +1,3 @@
 window.CONFIG = {
-    version: 'v1.0.6-bata1'
+    version: 'v1.0.6-bata2'
 };

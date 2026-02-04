@@ -8,7 +8,7 @@
   <h1>LX Sync Server</h1> -->
   <p>
     <img src="https://img.shields.io/badge/build-passing-brightgreen?style=flat-square" alt="Build Status">
-    <img src="https://img.shields.io/badge/version-v1.0.6-bata1-blue?style=flat-square" alt="Version">
+    <img src="https://img.shields.io/badge/version-v1.0.6-bata2-blue?style=flat-square" alt="Version">
     <img src="https://img.shields.io/badge/license-Apache%202.0-orange?style=flat-square" alt="License">
     <img src="https://img.shields.io/badge/node-%3E%3D16-green?style=flat-square" alt="Node Version">
   </p>

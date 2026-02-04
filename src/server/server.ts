@@ -894,7 +894,7 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
             }
 
             try {
-              console.log(`[DownloadProxy] Fetching (Attempt ${attempt}): ${targetUrl}`)
+              // console.log(`[DownloadProxy] Fetching (Attempt ${attempt}): ${targetUrl}`)
               const stream = needle.get(targetUrl, options)
 
               stream.on('response', (proxyRes: any) => {
@@ -902,13 +902,13 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
                 if ([301, 302, 303, 307, 308].includes(proxyRes.statusCode)) {
                   const location = proxyRes.headers.location
                   if (location) {
-                    console.log(`[DownloadProxy] Redirecting (${proxyRes.statusCode}): ${location}`)
+                    // console.log(`[DownloadProxy] Redirecting (${proxyRes.statusCode}): ${location}`)
                     doFetch(location, attempt + 1)
                     return
                   }
                 }
 
-                console.log(`[DownloadProxy] Serving Stream: ${proxyRes.statusCode}`)
+                // console.log(`[DownloadProxy] Serving Stream: ${proxyRes.statusCode}`)
 
                 // Handle Final Response
                 let contentType = proxyRes.headers['content-type'] || 'application/octet-stream'
@@ -1298,13 +1298,54 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
               result = await musicSdk[source].getMusicUrl(songInfo, quality || '128k')
             }
 
-            // [Fix] Server-side Mixed Content handling
-            // If the upstream URL is HTTP, rewrite it to use our secure proxy
-            if (result && result.url && result.url.startsWith('http://')) {
-              console.log(`[MusicUrl] Rewriting HTTP URL to proxy: ${result.url}`)
-              const filename = `${songInfo.singer || 'Unknown'} - ${songInfo.name || 'Song'}.mp3`
-              result.url = `/api/music/download?url=${encodeURIComponent(result.url)}&filename=${encodeURIComponent(filename)}&inline=1`
-              // result.url = result.url.replace('http://', 'https://')
+            // [Fix] Server-side Mixed Content handling & Redirect Resolution
+            // If the upstream URL is HTTP, rewrite it to use our secure proxy OR resolve it if it's a redirect
+            if (result && result.url) {
+              // 1. Resolve Redirects (301, 302, 307, etc.) to get direct link
+              try {
+                // Only try to resolve if it looks like a remote URL
+                if (result.url.startsWith('http')) {
+                  const needle = require('needle')
+                  const checkRedirect = async (u: string, depth: number = 0): Promise<string> => {
+                    if (depth > 3) return u // Max depth 3
+                    try {
+                      const resp = await needle('head', u, null, {
+                        follow_max: 0,
+                        response_timeout: 3000,
+                        read_timeout: 3000,
+                        headers: {
+                          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                          'Referer': new URL(u).origin
+                        }
+                      })
+                      if ([301, 302, 303, 307, 308].includes(resp.statusCode) && resp.headers.location) {
+                        let nextUrl = resp.headers.location
+                        if (!nextUrl.startsWith('http')) {
+                          try { nextUrl = new URL(nextUrl, u).href } catch (e) { }
+                        }
+                        console.log(`[MusicUrl] Resolving redirect (${resp.statusCode}): ${u} -> ${nextUrl}`)
+                        return checkRedirect(nextUrl, depth + 1)
+                      }
+                    } catch (e: any) {
+                      // console.warn(`[MusicUrl] Resolve check failed for ${u}:`, e.message)
+                    }
+                    return u
+                  }
+
+                  const finalUrl = await checkRedirect(result.url)
+                  if (finalUrl !== result.url) {
+                    result.url = finalUrl
+                  }
+                }
+              } catch (e) {
+                console.error('[MusicUrl] Resolve Error:', e)
+              }
+
+              // 2. Mixed Content Handling (Optional Proxy) implementation details handled by frontend now
+              // But we can keep the log for debugging
+              if (result.url.startsWith('http://')) {
+                console.log(`[MusicUrl] Note: URL is HTTP, frontend might proxy if enabled: ${result.url}`)
+              }
             }
 
             res.writeHead(200, { 'Content-Type': 'application/json' })

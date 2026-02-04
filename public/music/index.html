@@ -506,6 +506,34 @@
                                 <option value="all">全部显示</option>
                             </select>
                         </div>
+
+                        <div>
+                            <h3 class="font-medium text-emerald-600 mb-2">网络设置</h3>
+                            <div class="space-y-3">
+                                <div
+                                    class="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                    <span class="text-sm text-gray-600 font-medium">播放音乐代理 (Proxy Playback)</span>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" id="toggle-proxy-playback" class="sr-only peer"
+                                            onchange="changeProxyPlayback(this.checked)">
+                                        <div
+                                            class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500">
+                                        </div>
+                                    </label>
+                                </div>
+                                <div
+                                    class="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                    <span class="text-sm text-gray-600 font-medium">下载音乐代理 (Proxy Download)</span>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" id="toggle-proxy-download" class="sr-only peer"
+                                            onchange="changeProxyDownload(this.checked)">
+                                        <div
+                                            class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500">
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <!-- Sync Settings -->
                     <div class="pt-6 border-t border-gray-100">

@@ -144,39 +144,40 @@ async function downloadSong(songOrId, forceQuality = null, suppressAlerts = fals
         const result = await res.json();
 
         if (result.url) {
-            // Use server proxy to force download
-            let ext = result.type || 'mp3';
-            if (ext === '128k' || ext === '320k') ext = 'mp3';
+            let finalUrl = result.url;
 
-            const filename = `${song.singer} - ${song.name}.${ext}`;
-            let proxyUrl;
-            // [Fix] Check if URL is already proxied by server to prevent double wrapping
-            if (result.url.startsWith('/api/music/download')) {
-                // For existing proxy URL, we might want to update filename if needed,
-                // but usually the server-generated one is minimal. 
-                // We'll trust the server or just append `&filename=` if missing?
-                // Safest is to use it as is, or append filename if not present.
-                // Actually, let's just use it as is if it's already local.
-                proxyUrl = result.url;
-
-                // However, we want to force download filename if possible.
-                // The server rewrite logic is: /api/music/download?url=...&filename=...&inline=1
-                // If we want to change behavior (e.g. force download), we might need to tweak parameters.
-                // But for now, avoiding recursion is key.
+            // Check Proxy Download Setting
+            if (typeof settings !== 'undefined' && settings.enableProxyDownload) {
+                // Use server proxy to force download
+                // [Fix] Check if URL is already proxied by server to prevent double wrapping
+                if (finalUrl.startsWith('/api/music/download')) {
+                    // Already proxied, keep as is
+                } else {
+                    let ext = result.type || 'mp3';
+                    if (ext === '128k' || ext === '320k') ext = 'mp3';
+                    const filename = `${song.singer} - ${song.name}.${ext}`;
+                    finalUrl = `/api/music/download?url=${encodeURIComponent(result.url)}&filename=${encodeURIComponent(filename)}`;
+                }
             } else {
-                proxyUrl = `/api/music/download?url=${encodeURIComponent(result.url)}&filename=${encodeURIComponent(filename)}`;
+                // Proxy disabled: Use direct URL
+                console.log('[Download] Proxy disabled, using direct URL.');
             }
 
             // Create hidden link to trigger download
             const link = document.createElement('a');
-            link.href = proxyUrl;
+            link.href = finalUrl;
             link.target = '_blank';
-            // link.download = filename; // Optional, server sets Content-Disposition
+
+            // Attempt to set filename (Browser support varies for cross-origin)
+            let ext = result.type || 'mp3';
+            if (ext === '128k' || ext === '320k') ext = 'mp3';
+            link.download = `${song.singer} - ${song.name}.${ext}`;
+
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
 
-            console.log(`[Download] Triggered via proxy: ${song.name} [${quality}]`);
+            console.log(`[Download] Triggered: ${song.name} [${quality}]`);
             return true;
         } else {
             throw new Error('未获取到下载链接');
