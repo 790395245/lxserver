@@ -848,6 +848,7 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
       if (pathname === '/api/music/download' && req.method === 'GET') {
         const urlStr = urlObj.searchParams.get('url')
         const filename = urlObj.searchParams.get('filename') || 'download.mp3'
+        const isInline = urlObj.searchParams.get('inline') === '1'
 
         if (!urlStr) {
           res.writeHead(400)
@@ -856,7 +857,7 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
         }
 
         try {
-          console.log(`[DownloadProxy] Fetching: ${urlStr}`)
+          console.log(`[DownloadProxy] Fetching: ${urlStr} (Inline: ${isInline})`)
 
           // Use needle or built-in http/https to fetch stream
           const { get } = urlStr.startsWith('https') ? require('https') : require('http')
@@ -865,7 +866,11 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
             // Forward headers (optional, but good for length/type)
             const headers: Record<string, string | string[] | undefined> = {
               'Content-Type': proxyRes.headers['content-type'] || 'application/octet-stream',
-              'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`
+            }
+
+            // Only add attachment disposition if not inline
+            if (!isInline) {
+              headers['Content-Disposition'] = `attachment; filename="${encodeURIComponent(filename)}"`
             }
             if (proxyRes.headers['content-length']) {
               headers['Content-Length'] = proxyRes.headers['content-length']
@@ -1210,6 +1215,14 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
               }
               console.log(`[MusicUrl] Using built-in musicSdk for: ${source}`)
               result = await musicSdk[source].getMusicUrl(songInfo, quality || '128k')
+            }
+
+            // [Fix] Server-side Mixed Content handling
+            // If the upstream URL is HTTP, rewrite it to use our secure proxy
+            if (result && result.url && result.url.startsWith('http://')) {
+              console.log(`[MusicUrl] Rewriting HTTP URL to proxy: ${result.url}`)
+              const filename = `${songInfo.singer || 'Unknown'} - ${songInfo.name || 'Song'}.mp3`
+              result.url = `/api/music/download?url=${encodeURIComponent(result.url)}&filename=${encodeURIComponent(filename)}&inline=1`
             }
 
             res.writeHead(200, { 'Content-Type': 'application/json' })
