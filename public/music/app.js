@@ -12,7 +12,9 @@ const audio = document.getElementById('audio-player');
 // Settings & Batch Selection
 let settings = {
     itemsPerPage: 20, // Default 20 items per page, can be 'all'
-    preferredQuality: '320k' // 默认音质偏好
+    itemsPerPage: 20, // Default 20 items per page, can be 'all'
+    preferredQuality: '320k', // 默认音质偏好
+    enablePublicSources: true // 是否显示公开源
 };
 
 // 从 localStorage 加载设置
@@ -1961,6 +1963,7 @@ async function handleLocalLogin() {
             // Fetch List
             const listData = await syncManager.sync();
             currentListData = listData;
+            if (currentListData) currentListData.username = user; // Attach username
             renderMyLists(listData);
 
             // [Cache] Save list data immediately for offline availability / quick load
@@ -2301,6 +2304,12 @@ window.addEventListener('load', () => {
     // 0. Load settings first
     loadSettings();
 
+    // Checkbox State
+    const pubToggle = document.getElementById('toggle-public-sources');
+    if (pubToggle) {
+        pubToggle.checked = settings.enablePublicSources !== false;
+    }
+
     // Update UI to match settings
     const selectEl = document.getElementById('items-per-page-select');
     if (selectEl && settings.itemsPerPage) {
@@ -2603,8 +2612,59 @@ async function fetchCustomSources() {
     }
 }
 
+
+function updateSourceScopeUI() {
+    const username = currentListData?.username || 'default';
+    const isPublic = username === 'default';
+    const showPublic = settings.enablePublicSources !== false; // Default true
+
+    const settingsTag = document.getElementById('settings-source-scope-tag');
+    const modalTag = document.getElementById('modal-source-scope-info');
+
+    // Tag Content Logic
+    let tagHtml = '';
+    if (isPublic) {
+        tagHtml = `<span class="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-700 border border-blue-200">公开</span>`;
+    } else {
+        // User logged in
+        let userTag = `<span class="px-2 py-0.5 rounded text-xs font-bold bg-purple-100 text-purple-700 border border-purple-200">${username}</span>`;
+        if (showPublic) {
+            userTag += `<span class="ml-1 px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-700 border border-blue-200">公开</span>`
+        }
+        tagHtml = userTag;
+    }
+
+    if (settingsTag) settingsTag.innerHTML = tagHtml;
+
+    if (modalTag) {
+        modalTag.innerHTML = isPublic
+            ? `<div class="flex items-center gap-2 text-xs text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 w-fit mb-2"><i class="fas fa-globe"></i> 上传到: 公开</div>`
+            : `<div class="flex items-center gap-2 text-xs text-purple-600 bg-purple-50 px-3 py-1.5 rounded-lg border border-purple-100 w-fit mb-2"><i class="fas fa-user-circle"></i> 上传到: ${username}</div>`;
+    }
+}
+
+function togglePublicSourcesSetting() {
+    settings.enablePublicSources = !settings.enablePublicSources;
+    // Save
+    localStorage.setItem('lx_settings', JSON.stringify(settings));
+
+    // Refresh Logic
+    updateSourceScopeUI();
+    renderCustomSources(); // Re-render list
+}
+
 async function renderCustomSources() {
-    const list = await fetchCustomSources();
+    let list = await fetchCustomSources();
+
+    // Filter based on setting
+    if (settings.enablePublicSources === false) {
+        // Filter out sources where owner is 'open'. 
+        // Note: fetchCustomSources returns API objects. We need to check structure.
+        // The API returns array of { id, name, version, ..., owner: 'open' || 'username' }
+        list = list.filter(item => item.owner !== 'open');
+    }
+
+    updateSourceScopeUI();
 
     // 渲染目标容器 ID 列表：模态框内 & 设置界面内
     const targetIds = ['custom-sources-list', 'settings-custom-sources-list'];
@@ -3097,6 +3157,8 @@ window.reloadSource = reloadSource;
 window.toggleCustomSource = toggleSource;
 window.deleteCustomSource = deleteSource;
 window.importFromUrl = handleUrlImport;
+
+window.togglePublicSourcesSetting = togglePublicSourcesSetting;
 
 // Core functions
 window.switchTab = switchTab;

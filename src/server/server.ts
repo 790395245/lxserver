@@ -1180,6 +1180,8 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
 
       // [新增] 音乐 URL API
       if (pathname === '/api/music/url' && req.method === 'POST') {
+        const clientUsername = req.headers['x-user-name'] as string | undefined
+
         void readBody(req).then(async body => {
           try {
             const { songInfo, quality } = JSON.parse(body)
@@ -1190,10 +1192,11 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
             let result
 
             // 优先使用自定义源
-            if (isSourceSupported(source)) {
+            // 传递 clientUsername 进行权限过滤
+            if (isSourceSupported(source, clientUsername)) {
               try {
-                console.log(`[MusicUrl] Using custom source for: ${source}`)
-                result = await callUserApiGetMusicUrl(source, songInfo, quality || '128k')
+                console.log(`[MusicUrl] Using custom source for: ${source} (User: ${clientUsername || 'Guest'})`)
+                result = await callUserApiGetMusicUrl(source, songInfo, quality || '128k', clientUsername)
               } catch (userApiError: any) {
                 console.error(`[MusicUrl] Custom source failed:`, userApiError.message)
                 // 不抛出错误，继续尝试内置源
@@ -2347,7 +2350,8 @@ export const startServer = async (port: number, ip: string) => {
   // 初始化自定义源
   try {
     console.log('[Server] Initializing custom user APIs...')
-    await initUserApis('default')
+    // 修改：不传参数，默认加载 open + 所有用户源
+    await initUserApis()
     console.log('[Server] Custom user APIs initialized')
   } catch (err: any) {
     console.error('[Server] Failed to initialize user APIs:', err.message)

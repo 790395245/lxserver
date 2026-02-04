@@ -444,7 +444,10 @@
 
                     <div class="space-y-6">
                         <div>
-                            <h3 class="font-medium text-emerald-600 mb-3">自定义源</h3>
+                            <div class="flex items-center gap-2 mb-3">
+                                <h3 class="font-medium text-emerald-600">自定义源</h3>
+                                <span id="settings-source-scope-tag"></span>
+                            </div>
                             <p class="text-sm text-gray-500 mb-4">管理和配置第三方音乐源脚本</p>
 
                             <!-- 管理入口卡片 -->
@@ -464,6 +467,19 @@
                             <div id="settings-custom-sources-list" class="space-y-2">
                                 <!-- 列表将在此处渲染 -->
                                 <div class="text-xs text-gray-400 text-center py-2">暂无数据 (JS未加载)</div>
+                            </div>
+
+                            <!-- 公开源开关 -->
+                            <div
+                                class="mt-3 flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                <span class="text-sm text-gray-600 font-medium">启用公开源 (Public List)</span>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="toggle-public-sources" class="sr-only peer"
+                                        onchange="togglePublicSourcesSetting()">
+                                    <div
+                                        class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500">
+                                    </div>
+                                </label>
                             </div>
                         </div>
 
@@ -859,6 +875,7 @@
             <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-2xl">
                 <div>
                     <h3 class="text-xl font-bold text-gray-800">自定义源管理</h3>
+                    <div id="modal-source-scope-info" class="mt-1"></div>
                     <p class="text-sm text-gray-500 mt-1">管理和配置第三方音乐源脚本</p>
                 </div>
                 <button onclick="closeCustomSourceModal()"

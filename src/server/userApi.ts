@@ -15,6 +15,7 @@ interface UserApiInfo {
     script: string
     sources: Record<string, any>
     enabled: boolean
+    owner: string // 'open' or username
 }
 
 // 加载的 API 实例
@@ -260,7 +261,7 @@ export async function loadUserApi(apiInfo: UserApiInfo): Promise<any> {
         }
 
         loadedApis.set(apiInfo.id, apiInstance)
-        console.log(`[UserApi] ✓ 成功加载: ${fullApiInfo.name} v${fullApiInfo.version}`)
+        console.log(`[UserApi] ✓ 成功加载: ${fullApiInfo.name} v${fullApiInfo.version} (Owner: ${fullApiInfo.owner})`)
         console.log(`[UserApi]   支持源: ${Object.keys(registeredSources).join(', ')}`)
         return { success: true, apiInstance, error: null }
     } catch (error: any) {
@@ -274,7 +275,8 @@ export async function loadUserApi(apiInfo: UserApiInfo): Promise<any> {
 export async function callUserApiGetMusicUrl(
     source: string,
     songInfo: any,
-    quality: string
+    quality: string,
+    clientUsername?: string
 ): Promise<{ url: string, type: string }> {
     // 标准化 songInfo 格式：将 meta 中的字段提升到顶层
     const normalizedSongInfo = { ...songInfo }
@@ -337,8 +339,6 @@ export async function callUserApiGetMusicUrl(
     }
 
     // ========== 顶层字段兜底映射 ==========
-    // 如果直接在顶层就有这些字段,确保能被自定义 JS 访问到
-    // (有些搜索结果可能直接返回扁平结构)
     if (!normalizedSongInfo.hash && songInfo.hash) {
         normalizedSongInfo.hash = songInfo.hash
     }
@@ -368,18 +368,24 @@ export async function callUserApiGetMusicUrl(
     let lastError: Error | null = null;
 
     // 查找支持该 source 的 API
-    // 收集所有支持该 source 的 API
+    // 收集所有支持该 source 的 API，并根据权限过滤
     const candidates: any[] = []
     for (const [apiId, api] of loadedApis) {
         if (!api.info.enabled) continue
         if (!api.info.sources || !api.info.sources[source]) continue
-        candidates.push(api)
+
+        // 权限校验：只允许 open 源 或 当前用户及其拥有的源
+        if (api.info.owner === 'open' || (clientUsername && api.info.owner === clientUsername)) {
+            candidates.push(api)
+        }
     }
 
     supportedCount = candidates.length
 
     if (supportedCount === 0) {
-        throw new Error(`未找到支持 ${source} 平台的自定义源，请在设置中添加或启用相关源`)
+        // 如果没有找到源，可能是因为权限问题导致筛选后为空
+        // 检查是否存在该源但无权限访问的情况（可选，用于调试）
+        throw new Error(`未找到支持 ${source} 平台的自定义源，请在设置中添加或启用相关源 (User: ${clientUsername || 'Guest'})`)
     }
 
     // 逻辑分歧：
@@ -392,7 +398,7 @@ export async function callUserApiGetMusicUrl(
 
         for (let i = 0; i < maxRetries; i++) {
             try {
-                console.log(`[UserApi] 尝试 ${api.info.name} 获取 ${source} 音乐链接 (第 ${i + 1}/${maxRetries} 次)`)
+                console.log(`[UserApi] 尝试 ${api.info.name} 获取 ${source} 音乐链接 (第 ${i + 1}/${maxRetries} 次, Owner: ${api.info.owner})`)
 
                 const url = await api.callRequest('musicUrl', source, {
                     musicInfo: normalizedSongInfo,
@@ -414,7 +420,7 @@ export async function callUserApiGetMusicUrl(
         // 多个源，轮流尝试
         for (const api of candidates) {
             try {
-                console.log(`[UserApi] 尝试 ${api.info.name} 获取 ${source} 音乐链接`)
+                console.log(`[UserApi] 尝试 ${api.info.name} 获取 ${source} 音乐链接 (Owner: ${api.info.owner})`)
 
                 const url = await api.callRequest('musicUrl', source, {
                     musicInfo: normalizedSongInfo,
@@ -434,57 +440,48 @@ export async function callUserApiGetMusicUrl(
     throw new Error(`已尝试 ${supportedCount} 个支持 ${source} 的源 (或单源尝试 ${supportedCount === 1 ? 3 : supportedCount} 次)，但全部失败。最后错误: ${lastError?.message}`)
 }
 
-// 从文件系统加载所有已启用的自定义源
-export async function initUserApis(username: string = 'default') {
-    const sourcesDir = path.join(process.cwd(), 'data', 'users', username, 'custom_sources')
-    const metaPath = path.join(sourcesDir, 'sources.json')
-
-    // 清空现有加载的 API
-    loadedApis.clear()
-
+// 辅助函数：加载指定目录下的源
+async function loadSourcesFromDir(dirPath: string, owner: string, stats: { loadedCount: number }) {
+    const metaPath = path.join(dirPath, 'sources.json')
     if (!fs.existsSync(metaPath)) {
-        console.log('[UserApi] 未找到 sources.json')
         return
     }
 
     try {
         const sources = JSON.parse(fs.readFileSync(metaPath, 'utf-8'))
-        let loadedCount = 0
         let needsSave = false
 
         for (const source of sources) {
-            // 即使禁用了，如果有错乱的元数据，按理说也暂时不用管，只有启用的才修正。
-            // 但为了保持一致性，仅在成功加载时修正。
             if (!source.enabled) {
-                console.log(`[UserApi] 跳过已禁用: ${source.name}`)
+                console.log(`[UserApi] [${owner}] 跳过已禁用: ${source.name}`)
                 continue
             }
 
-            const scriptPath = path.join(sourcesDir, source.id)
+            const scriptPath = path.join(dirPath, source.id)
             if (!fs.existsSync(scriptPath)) {
-                console.warn(`[UserApi] 脚本文件未找到: ${source.id}`)
+                console.warn(`[UserApi] [${owner}] 脚本文件未找到: ${source.id}`)
                 continue
             }
 
             try {
                 const script = fs.readFileSync(scriptPath, 'utf-8')
-                // 从脚本中提取真实的名称
                 const metadata = extractMetadata(script)
 
                 const result = await loadUserApi({
                     id: source.id,
-                    name: metadata.name || source.name, // 使用脚本内的name,而不是文件名
+                    name: metadata.name || source.name,
                     description: metadata.description || '',
                     version: metadata.version || 1,
                     author: metadata.author || '',
                     homepage: metadata.homepage || '',
                     script,
                     sources: {},
-                    enabled: true
+                    enabled: true,
+                    owner: owner // 设置 owner
                 })
 
                 if (result.success) {
-                    loadedCount++
+                    stats.loadedCount++
                     apiStatus.set(source.id, { status: 'success' })
 
                     // [Self-Healing] 检查并修复 supportedSources
@@ -492,38 +489,97 @@ export async function initUserApis(username: string = 'default') {
                     const storedSources = (source.supportedSources || []).sort();
 
                     if (JSON.stringify(runtimeSources) !== JSON.stringify(storedSources)) {
-                        console.log(`[UserApi] [Fix] 更新源 ${source.name} 的支持列表: ${JSON.stringify(storedSources)} -> ${JSON.stringify(runtimeSources)}`);
+                        console.log(`[UserApi] [Fix] [${owner}] 更新源 ${source.name} 的支持列表: ${JSON.stringify(storedSources)} -> ${JSON.stringify(runtimeSources)}`);
                         source.supportedSources = runtimeSources;
-                        // 同时更新其他可能缺失的元数据
                         if (metadata.version && source.version !== metadata.version) source.version = metadata.version;
                         if (metadata.author && source.author !== metadata.author) source.author = metadata.author;
                         if (metadata.description && source.description !== metadata.description) source.description = metadata.description;
                         if (metadata.homepage && source.homepage !== metadata.homepage) source.homepage = metadata.homepage;
-
                         needsSave = true;
                     }
-
                 } else {
-                    console.error(`[UserApi] 加载 ${metadata.name || source.name} 失败: ${result.error}`)
+                    console.error(`[UserApi] [${owner}] 加载 ${metadata.name || source.name} 失败: ${result.error}`)
                     apiStatus.set(source.id, { status: 'failed', error: result.error })
                 }
             } catch (error: any) {
-                console.error(`[UserApi] 加载 ${source.name} 失败:`, error.message)
+                console.error(`[UserApi] [${owner}] 加载 ${source.name} 失败:`, error.message)
                 apiStatus.set(source.id, { status: 'failed', error: error.message })
             }
         }
 
         if (needsSave) {
             fs.writeFileSync(metaPath, JSON.stringify(sources, null, 2));
-            console.log('[UserApi] 已更新 sources.json 元数据');
+            console.log(`[UserApi] [${owner}] 已更新 sources.json 元数据`);
+        }
+    } catch (error: any) {
+        console.error(`[UserApi] [${owner}] 读取 sources.json 失败:`, error.message)
+    }
+}
+
+// 从文件系统加载所有已启用的自定义源
+// 路径变更：/data/data/users/source/{username} 和 /data/data/users/source/_open
+export async function initUserApis(targetUser?: string) {
+    const sourceRoot = path.join(process.cwd(), 'data', 'data', 'users', 'source')
+    const stats = { loadedCount: 0 }
+
+    console.log(`[UserApi] ========================================`)
+
+    // 如果根目录不存在，无需加载
+    if (!fs.existsSync(sourceRoot)) {
+        console.log(`[UserApi] Source root directory not found: ${sourceRoot}`)
+        console.log(`[UserApi] ========================================`)
+        return
+    }
+
+    if (targetUser) {
+        console.log(`[UserApi] 重新加载用户源: ${targetUser}`)
+        // 清理该用户的旧源
+        for (const [id, api] of loadedApis.entries()) {
+            if (api.info.owner === targetUser) {
+                loadedApis.delete(id)
+            }
         }
 
-        console.log(`[UserApi] ========================================`)
-        console.log(`[UserApi] 已初始化 ${loadedCount} 个自定义源`)
-        console.log(`[UserApi] ========================================`)
-    } catch (error: any) {
-        console.error('[UserApi] 初始化失败:', error.message)
+        // 加载该用户的源
+        let dirName = targetUser
+
+        // 特殊处理：如果是 'open'，对应目录是 '_open'
+        if (targetUser === 'open') {
+            dirName = '_open'
+        }
+
+        const userSourceDir = path.join(sourceRoot, dirName)
+        if (fs.existsSync(userSourceDir)) {
+            await loadSourcesFromDir(userSourceDir, targetUser, stats)
+        }
+
+    } else {
+        console.log(`[UserApi] 初始化所有自定义源...`)
+        loadedApis.clear()
+
+        // 扫描 sourceRoot 下的所有子目录
+        try {
+            const entries = fs.readdirSync(sourceRoot, { withFileTypes: true })
+            for (const entry of entries) {
+                if (entry.isDirectory()) {
+                    let owner = entry.name
+                    // 如果目录是 _open，owner 为 'open'
+                    if (entry.name === '_open') {
+                        owner = 'open'
+                    }
+
+                    const dirPath = path.join(sourceRoot, entry.name)
+                    await loadSourcesFromDir(dirPath, owner, stats)
+                }
+            }
+        } catch (error: any) {
+            console.error('[UserApi] 扫描源目录失败:', error.message)
+        }
     }
+
+    console.log(`[UserApi] 本次加载: ${stats.loadedCount} 个源`)
+    console.log(`[UserApi] 当前总计: ${loadedApis.size} 个源`)
+    console.log(`[UserApi] ========================================`)
 }
 
 // 获取所有已加载的 API
@@ -532,9 +588,15 @@ export function getLoadedApis() {
 }
 
 // 检查某个源是否被支持
-export function isSourceSupported(source: string): boolean {
+// clientUsername: 调用者的用户名。如果未提供，则只能检查 open 源
+export function isSourceSupported(source: string, clientUsername?: string): boolean {
     for (const [apiId, api] of loadedApis) {
-        if (api.info.enabled && api.info.sources && api.info.sources[source]) {
+        if (!api.info.enabled || !api.info.sources || !api.info.sources[source]) {
+            continue
+        }
+
+        // 权限检查
+        if (api.info.owner === 'open' || (clientUsername && api.info.owner === clientUsername)) {
             return true
         }
     }
