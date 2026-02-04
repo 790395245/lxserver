@@ -118,9 +118,16 @@ async function downloadSong(songOrId, forceQuality = null, suppressAlerts = fals
     }
 
     try {
+        const headers = { 'Content-Type': 'application/json' };
+        const authToken = sessionStorage.getItem('lx_player_auth');
+        if (authToken) headers['x-user-token'] = authToken;
+        if (typeof currentListData !== 'undefined' && currentListData && currentListData.username) {
+            headers['x-user-name'] = currentListData.username;
+        }
+
         const res = await fetch(`${API_BASE}/url`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({ songInfo: song, quality })
         });
 
@@ -142,7 +149,23 @@ async function downloadSong(songOrId, forceQuality = null, suppressAlerts = fals
             if (ext === '128k' || ext === '320k') ext = 'mp3';
 
             const filename = `${song.singer} - ${song.name}.${ext}`;
-            const proxyUrl = `/api/music/download?url=${encodeURIComponent(result.url)}&filename=${encodeURIComponent(filename)}`;
+            let proxyUrl;
+            // [Fix] Check if URL is already proxied by server to prevent double wrapping
+            if (result.url.startsWith('/api/music/download')) {
+                // For existing proxy URL, we might want to update filename if needed,
+                // but usually the server-generated one is minimal. 
+                // We'll trust the server or just append `&filename=` if missing?
+                // Safest is to use it as is, or append filename if not present.
+                // Actually, let's just use it as is if it's already local.
+                proxyUrl = result.url;
+
+                // However, we want to force download filename if possible.
+                // The server rewrite logic is: /api/music/download?url=...&filename=...&inline=1
+                // If we want to change behavior (e.g. force download), we might need to tweak parameters.
+                // But for now, avoiding recursion is key.
+            } else {
+                proxyUrl = `/api/music/download?url=${encodeURIComponent(result.url)}&filename=${encodeURIComponent(filename)}`;
+            }
 
             // Create hidden link to trigger download
             const link = document.createElement('a');

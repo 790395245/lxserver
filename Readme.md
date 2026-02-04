@@ -1,12 +1,14 @@
 # LX Music Sync Server (Enhanced Edition)
 
+![lxserver](https://socialify.git.ci/XCQ0607/lxserver/image?description=1&forks=1&issues=1&logo=https://raw.githubusercontent.com/XCQ0607/lxserver/refs/heads/main/public/icon.svg&owner=1&pulls=1&stargazers=1&theme=Auto)
+
 <div align="center">
-  <img src="public/icon.svg" width="120" height="120" alt="Icon">
-  <br>
-  <h1>LX Sync Server</h1>
+  <!-- <img src="public/icon.svg" width="120" height="120" alt="Icon"> -->
+  <!-- <br>
+  <h1>LX Sync Server</h1> -->
   <p>
     <img src="https://img.shields.io/badge/build-passing-brightgreen?style=flat-square" alt="Build Status">
-    <img src="https://img.shields.io/badge/version-v1.0.6-blue?style=flat-square" alt="Version">
+    <img src="https://img.shields.io/badge/version-v1.0.6-bata1-blue?style=flat-square" alt="Version">
     <img src="https://img.shields.io/badge/license-Apache%202.0-orange?style=flat-square" alt="License">
     <img src="https://img.shields.io/badge/node-%3E%3D16-green?style=flat-square" alt="Node Version">
   </p>

@@ -859,30 +859,111 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
         try {
           console.log(`[DownloadProxy] Fetching: ${urlStr} (Inline: ${isInline})`)
 
-          // Use needle or built-in http/https to fetch stream
-          const { get } = urlStr.startsWith('https') ? require('https') : require('http')
+          // Use needle to fetch stream (supports redirects and more robust)
+          const needle = require('needle')
 
-          get(urlStr, (proxyRes: IncomingMessage) => {
-            // Forward headers (optional, but good for length/type)
-            const headers: Record<string, string | string[] | undefined> = {
-              'Content-Type': proxyRes.headers['content-type'] || 'application/octet-stream',
+          // Manual redirect handling for maximum control and stability
+          const doFetch = (targetUrl: string, attempt: number) => {
+            if (attempt > 5) {
+              console.error('[DownloadProxy] Too many redirects')
+              if (!res.headersSent) {
+                res.writeHead(502)
+                res.end('Too Many Redirects')
+              }
+              return
             }
 
-            // Only add attachment disposition if not inline
-            if (!isInline) {
-              headers['Content-Disposition'] = `attachment; filename="${encodeURIComponent(filename)}"`
-            }
-            if (proxyRes.headers['content-length']) {
-              headers['Content-Length'] = proxyRes.headers['content-length']
+            const options: any = {
+              follow_max: 0, // Disable auto-follow
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                // 'Referer': new URL(targetUrl).origin // Move to separate try-catch to avoid crash on relative/invalid URLs
+              }
             }
 
-            res.writeHead(proxyRes.statusCode || 200, headers)
-            proxyRes.pipe(res)
-          }).on('error', (err: any) => {
-            console.error('[DownloadProxy] Request Error:', err)
-            res.writeHead(502)
-            res.end('Bad Gateway')
-          })
+            try {
+              options.headers['Referer'] = new URL(targetUrl).origin
+            } catch (e) {
+              // Ignore invalid URLs for Referer
+              console.warn(`[DownloadProxy] Could not generate Referer for: ${targetUrl}`)
+            }
+
+            // Forward Range header
+            if (req.headers['range']) {
+              options.headers['Range'] = req.headers['range']
+            }
+
+            try {
+              console.log(`[DownloadProxy] Fetching (Attempt ${attempt}): ${targetUrl}`)
+              const stream = needle.get(targetUrl, options)
+
+              stream.on('response', (proxyRes: any) => {
+                // Handle Redirects
+                if ([301, 302, 303, 307, 308].includes(proxyRes.statusCode)) {
+                  const location = proxyRes.headers.location
+                  if (location) {
+                    console.log(`[DownloadProxy] Redirecting (${proxyRes.statusCode}): ${location}`)
+                    doFetch(location, attempt + 1)
+                    return
+                  }
+                }
+
+                console.log(`[DownloadProxy] Serving Stream: ${proxyRes.statusCode}`)
+
+                // Handle Final Response
+                let contentType = proxyRes.headers['content-type'] || 'application/octet-stream'
+                if (contentType.includes('audio/') || contentType.includes('video/')) {
+                  contentType = contentType.split(';')[0].trim()
+                }
+
+                const headers: Record<string, string | string[] | undefined> = {
+                  'Content-Type': contentType,
+                  'Access-Control-Allow-Origin': '*',
+                }
+
+                if (proxyRes.headers['content-length']) headers['Content-Length'] = proxyRes.headers['content-length']
+                if (proxyRes.headers['accept-ranges']) headers['Accept-Ranges'] = proxyRes.headers['accept-ranges']
+                if (proxyRes.headers['content-range']) headers['Content-Range'] = proxyRes.headers['content-range']
+
+                if (!isInline) {
+                  headers['Content-Disposition'] = `attachment; filename="${encodeURIComponent(filename)}"`
+                }
+
+                if (!res.headersSent) {
+                  res.writeHead(proxyRes.statusCode || 200, headers)
+                  proxyRes.pipe(res)
+                }
+              })
+
+              stream.on('done', (err: any) => {
+                if (err) {
+                  console.error('[DownloadProxy] Stream Done Error:', err)
+                  if (!res.headersSent) {
+                    res.writeHead(502)
+                    res.end('Stream Error')
+                  }
+                }
+              })
+
+              stream.on('error', (err: any) => {
+                console.error('[DownloadProxy] Request Error:', err)
+                if (!res.headersSent) {
+                  res.writeHead(502)
+                  res.end('Request Error')
+                }
+              })
+
+            } catch (err: any) {
+              console.error('[DownloadProxy] Try Error:', err)
+              if (!res.headersSent) {
+                res.writeHead(500)
+                res.end('Internal Server Error')
+              }
+            }
+          }
+
+          // Start the fetch process
+          doFetch(urlStr, 0)
 
         } catch (err: any) {
           console.error('[DownloadProxy] Error:', err)
@@ -1223,6 +1304,7 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
               console.log(`[MusicUrl] Rewriting HTTP URL to proxy: ${result.url}`)
               const filename = `${songInfo.singer || 'Unknown'} - ${songInfo.name || 'Song'}.mp3`
               result.url = `/api/music/download?url=${encodeURIComponent(result.url)}&filename=${encodeURIComponent(filename)}&inline=1`
+              // result.url = result.url.replace('http://', 'https://')
             }
 
             res.writeHead(200, { 'Content-Type': 'application/json' })

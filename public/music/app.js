@@ -1188,7 +1188,8 @@ audio.addEventListener('pause', () => {
 
 function updatePositionState() {
     if ('mediaSession' in navigator && navigator.mediaSession.setPositionState) {
-        if (audio.duration && !isNaN(audio.duration)) {
+        // Ensure duration is finite (not Infinity/NaN) before updating
+        if (Number.isFinite(audio.duration) && audio.duration > 0) {
             try {
                 navigator.mediaSession.setPositionState({
                     duration: audio.duration,
@@ -1278,12 +1279,19 @@ function updateMediaSessionMetadata(song) {
 
 
 function seek(e) {
+    // Prevent seek if audio is not ready or has infinite duration (live stream)
+    if (!audio.duration || !Number.isFinite(audio.duration)) return;
+
     const container = document.getElementById('progress-container');
     const rect = container.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    const pct = x / rect.width;
+    const pct = Math.max(0, Math.min(1, x / rect.width)); // Clamp between 0 and 1
     const time = pct * audio.duration;
-    audio.currentTime = time;
+
+    // Ensure time is valid
+    if (Number.isFinite(time)) {
+        audio.currentTime = time;
+    }
 }
 
 // ========== 音量控制 ==========
