@@ -49,12 +49,19 @@ jobs:
           cd release
           zip -r lx-music-sync-server-${{ env.PROJECT_VERSION }}.zip lx-music-sync-server
 
+      - name: Get Release Notes
+        id: get_notes
+        run: |
+          # 尝试从 changelog.md 提取最新版本的日志
+          # 假设格式为 "## v1.0.1 ..." 开始，到下一个 "## " 结束
+          awk '/^## v/ {if (p) exit; p=1} p' changelog.md > RELEASE_NOTES.md || cp changelog.md RELEASE_NOTES.md
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ env.PROJECT_VERSION }}
           name: LX Music Sync Server ${{ env.PROJECT_VERSION }}
+          body_path: RELEASE_NOTES.md
           files: release/lx-music-sync-server-${{ env.PROJECT_VERSION }}.zip
           draft: false
           prerelease: false
-          generate_release_notes: true

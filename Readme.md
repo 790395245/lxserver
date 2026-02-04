@@ -6,13 +6,13 @@
   <h1>LX Sync Server</h1>
   <p>
     <img src="https://img.shields.io/badge/build-passing-brightgreen?style=flat-square" alt="Build Status">
-    <img src="https://img.shields.io/badge/version-v1.0.0-blue?style=flat-square" alt="Version">
+    <img src="https://img.shields.io/badge/version-v1.0.1-blue?style=flat-square" alt="Version">
     <img src="https://img.shields.io/badge/license-Apache%202.0-orange?style=flat-square" alt="License">
     <img src="https://img.shields.io/badge/node-%3E%3D16-green?style=flat-square" alt="Node Version">
   </p>
 </div>
 
-[English](README_EN.md) | [简体中文](README.md)
+[网页播放器 WebPlayer](md/WEBPLAYER.md) | [更新日志 Changelog](changelog.md)
 
 基于 [lyswhut/lx-music-sync-server](https://github.com/lyswhut/lx-music-sync-server) 开发的增强版 LX Music 数据同步服务端。
 

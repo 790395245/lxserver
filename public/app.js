@@ -307,6 +307,11 @@ class App {
                 versionEl.textContent = window.CONFIG.version;
                 versionEl.classList.remove('hidden');
             }
+            const sidebarVersionEl = document.getElementById('sidebar-version');
+            if (sidebarVersionEl) {
+                sidebarVersionEl.textContent = window.CONFIG.version;
+                sidebarVersionEl.classList.remove('hidden');
+            }
         }
     }
 

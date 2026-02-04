@@ -50,6 +50,10 @@ jobs:
           tags: |
             type=raw,value=latest
             type=raw,value=${{ env.PROJECT_VERSION }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.description=LX Music Sync Server (Enhanced Edition)
+            org.opencontainers.image.licenses=Apache-2.0
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5

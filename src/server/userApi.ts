@@ -368,34 +368,70 @@ export async function callUserApiGetMusicUrl(
     let lastError: Error | null = null;
 
     // 查找支持该 source 的 API
+    // 收集所有支持该 source 的 API
+    const candidates: any[] = []
     for (const [apiId, api] of loadedApis) {
         if (!api.info.enabled) continue
         if (!api.info.sources || !api.info.sources[source]) continue
+        candidates.push(api)
+    }
 
-        supportedCount++;
+    supportedCount = candidates.length
 
-        try {
-            console.log(`[UserApi] 尝试 ${api.info.name} 获取 ${source} 音乐链接`)
+    if (supportedCount === 0) {
+        throw new Error(`未找到支持 ${source} 平台的自定义源，请在设置中添加或启用相关源`)
+    }
 
-            const url = await api.callRequest('musicUrl', source, {
-                musicInfo: normalizedSongInfo,
-                type: quality
-            })
+    // 逻辑分歧：
+    // 1. 如果只有一个源支持 -> 重试 3 次
+    // 2. 如果有多个源支持 -> 每个源试一次 (轮询)
 
-            console.log(`[UserApi] ✓ ${api.info.name} 成功返回链接`)
-            return { url, type: quality }
-        } catch (error: any) {
-            console.error(`[UserApi] ${api.info.name} 失败:`, error.message)
-            lastError = error;
-            continue
+    if (supportedCount === 1) {
+        const api = candidates[0]
+        const maxRetries = 3
+
+        for (let i = 0; i < maxRetries; i++) {
+            try {
+                console.log(`[UserApi] 尝试 ${api.info.name} 获取 ${source} 音乐链接 (第 ${i + 1}/${maxRetries} 次)`)
+
+                const url = await api.callRequest('musicUrl', source, {
+                    musicInfo: normalizedSongInfo,
+                    type: quality
+                })
+
+                console.log(`[UserApi] ✓ ${api.info.name} 成功返回链接`)
+                return { url, type: quality }
+            } catch (error: any) {
+                console.error(`[UserApi] ${api.info.name} 失败 (第 ${i + 1}/${maxRetries} 次):`, error.message)
+                lastError = error
+                // 如果不是最后一次尝试，等待一小会儿
+                if (i < maxRetries - 1) {
+                    await new Promise(r => setTimeout(r, 1000))
+                }
+            }
+        }
+    } else {
+        // 多个源，轮流尝试
+        for (const api of candidates) {
+            try {
+                console.log(`[UserApi] 尝试 ${api.info.name} 获取 ${source} 音乐链接`)
+
+                const url = await api.callRequest('musicUrl', source, {
+                    musicInfo: normalizedSongInfo,
+                    type: quality
+                })
+
+                console.log(`[UserApi] ✓ ${api.info.name} 成功返回链接`)
+                return { url, type: quality }
+            } catch (error: any) {
+                console.error(`[UserApi] ${api.info.name} 失败:`, error.message)
+                lastError = error
+                continue
+            }
         }
     }
 
-    if (supportedCount > 0) {
-        throw new Error(`已尝试 ${supportedCount} 个支持 ${source} 的源，但全部失败。最后错误: ${lastError?.message}`)
-    } else {
-        throw new Error(`未找到支持 ${source} 平台的自定义源，请在设置中添加或启用相关源`)
-    }
+    throw new Error(`已尝试 ${supportedCount} 个支持 ${source} 的源 (或单源尝试 ${supportedCount === 1 ? 3 : supportedCount} 次)，但全部失败。最后错误: ${lastError?.message}`)
 }
 
 // 从文件系统加载所有已启用的自定义源

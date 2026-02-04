@@ -846,6 +846,7 @@ async function playSong(song, index, forceQuality = null) {
 
     // 显示加载状态
     setPlayerStatus('正在获取播放链接...');
+    try { audio.pause(); } catch (e) { } // 确保上一首立即停止
     updatePlayButton(false); // 暂停按钮状态
 
     try {
