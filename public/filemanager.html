@@ -8,18 +8,21 @@
 
     <!-- jQuery & jQuery UI (elFinder 依赖) -->
 
-    <link rel="stylesheet" href="/vendor/jquery-ui/jquery-ui.min.css">
-    <script src="/vendor/jquery/jquery.min.js"></script>
-    <script src="/vendor/jquery/jquery-migrate.min.js"></script>
-    <script src="/vendor/jquery-ui/jquery-ui.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.13.2/themes/base/jquery-ui.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-migrate/3.4.1/jquery-migrate.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.13.2/jquery-ui.min.js"></script>
+
 
     <!-- elFinder CSS -->
-    <link rel="stylesheet" href="/vendor/elfinder/css/elfinder.min.css">
-    <link rel="stylesheet" href="/vendor/elfinder/css/theme.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/elfinder/2.1.62/css/elfinder.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/elfinder/2.1.62/css/theme.min.css">
+
 
     <!-- elFinder JS -->
-    <script src="/vendor/elfinder/js/elfinder.min.js"></script>
-    <script src="/vendor/elfinder/js/i18n/elfinder.zh_CN.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/elfinder/2.1.62/js/elfinder.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/elfinder/2.1.62/js/i18n/elfinder.zh_CN.min.js"></script>
+
 
     <style>
         * {
@@ -165,7 +168,7 @@
             // 2. 检查 elFinder 是否加载成功
             if (typeof $().elfinder !== 'function') {
                 console.error('elFinder plugin not loaded');
-                $('#elfinder').html('<div style="color:white;padding:20px;text-align:center"><h3>elFinder 加载失败</h3><p>请检查本地资源文件比如 /vendor/elfinder 目录是否完整</p></div>');
+                $('#elfinder').html('<div style="color:white;padding:20px;text-align:center"><h3>elFinder 加载失败</h3><p>请检查网络连接或 CDN 资源是否可访问</p></div>');
                 return;
             }
 
