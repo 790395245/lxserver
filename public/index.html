@@ -21,7 +21,9 @@
             });
         }
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="/vendor/js/marked.min.js"></script>
+    <script src="config.js"></script>
+    <link href="/vendor/fonts/inter.css" rel="stylesheet">
 </head>
 
 <body>
@@ -45,12 +47,11 @@
 
     <!-- 主应用界面 -->
     <div id="app" class="hidden">
+        <div id="mobile-sidebar-overlay" class="mobile-sidebar-overlay hidden"></div>
         <!-- 侧边栏 -->
         <aside class="sidebar glass">
             <div class="sidebar-header">
-                <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M9 18V5l12-2v13M6 15v8m6-8v8" />
-                </svg>
+                <img src="/icon.svg" class="logo-icon" alt="Logo" style="width: 32px; height: 32px;">
                 <h2>LX Sync</h2>
             </div>
 
@@ -139,6 +140,15 @@
                     </svg>
                     <span>Web播放器</span>
                 </a>
+
+                <a href="#" class="nav-item" data-view="about">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                    </svg>
+                    <span>关于</span>
+                </a>
             </nav>
 
             <div class="sidebar-footer">
@@ -154,7 +164,20 @@
         <!-- 主内容区 -->
         <main class="main-content">
             <header class="top-bar glass">
-                <h2 id="page-title">仪表盘</h2>
+                <div class="header-left-group">
+                    <button id="mobile-menu-btn" class="btn-icon mobile-only"
+                        style="display: none; margin-right: 1rem;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            style="width: 24px; height: 24px;">
+                            <line x1="3" y1="12" x2="21" y2="12"></line>
+                            <line x1="3" y1="6" x2="21" y2="6"></line>
+                            <line x1="3" y1="18" x2="21" y2="18"></line>
+                        </svg>
+                    </button>
+                    <h2 id="page-title">仪表盘</h2>
+                    <span id="console-version"
+                        class="text-xs font-mono bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full ml-3 hidden md:inline-block"></span>
+                </div>
                 <div class="top-bar-actions">
                     <button id="install-pwa-btn" class="btn-secondary"
                         style="display: none; margin-right: 1rem; padding: 0.5rem 1rem; font-size: 0.875rem;">
@@ -620,6 +643,17 @@
                         </div>
                         <div id="snapshots-list" class="snapshots-list">
                             <!-- 快照列表将在这里渲染 -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 关于视图 -->
+                <div id="view-about" class="view">
+                    <div class="glass" style="padding: 40px; max-width: 900px; margin: 0 auto;">
+                        <div id="about-content" class="about-content"
+                            style="line-height: 1.8; color: var(--text-primary);">
+                            <!-- Markdown content will be rendered here -->
+                            <div style="text-align: center; color: var(--text-secondary);">加载中...</div>
                         </div>
                     </div>
                 </div>

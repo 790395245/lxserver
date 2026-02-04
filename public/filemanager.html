@@ -7,18 +7,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
 
     <!-- jQuery & jQuery UI (elFinder 依赖) -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.13.2/themes/base/jquery-ui.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-migrate/3.4.1/jquery-migrate.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.13.2/jquery-ui.min.js"></script>
+
+    <link rel="stylesheet" href="/vendor/jquery-ui/jquery-ui.min.css">
+    <script src="/vendor/jquery/jquery.min.js"></script>
+    <script src="/vendor/jquery/jquery-migrate.min.js"></script>
+    <script src="/vendor/jquery-ui/jquery-ui.min.js"></script>
 
     <!-- elFinder CSS -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/elfinder/2.1.62/css/elfinder.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/elfinder/2.1.62/css/theme.min.css">
+    <link rel="stylesheet" href="/vendor/elfinder/css/elfinder.min.css">
+    <link rel="stylesheet" href="/vendor/elfinder/css/theme.min.css">
 
     <!-- elFinder JS -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/elfinder/2.1.62/js/elfinder.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/elfinder/2.1.62/js/i18n/elfinder.zh_CN.min.js"></script>
+    <script src="/vendor/elfinder/js/elfinder.min.js"></script>
+    <script src="/vendor/elfinder/js/i18n/elfinder.zh_CN.min.js"></script>
 
     <style>
         * {
@@ -95,6 +96,32 @@
             background: #f8f9fa !important;
         }
     </style>
+    <style>
+        /* Mobile Adaptation */
+        @media screen and (max-width: 768px) {
+            .header {
+                padding: 0.75rem 1rem;
+            }
+
+            .header h1 {
+                font-size: 1.1rem;
+            }
+
+            .quick-nav {
+                gap: 0.5rem;
+            }
+
+            .btn-quick {
+                padding: 0.5rem;
+                justify-content: center;
+                min-width: 36px;
+            }
+
+            .btn-quick span {
+                display: none;
+            }
+        }
+    </style>
 </head>
 
 <body>
@@ -104,21 +131,21 @@
                 style="width: 24px; height: 24px;">
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
             </svg>
-            文件管理器
+            <span>文件管理器</span>
         </h1>
         <div class="quick-nav">
-            <button class="btn-quick" onclick="goToDataFolder()">
+            <button class="btn-quick" onclick="goToDataFolder()" title="数据文件夹">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
                 </svg>
-                数据文件夹
+                <span>数据文件夹</span>
             </button>
-            <a href="/" class="btn-quick">
+            <a href="/" class="btn-quick" title="返回主页">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="19" y1="12" x2="5" y2="12" />
                     <polyline points="12 19 5 12 12 5" />
                 </svg>
-                返回主页
+                <span>返回主页</span>
             </a>
         </div>
     </div>
@@ -138,7 +165,7 @@
             // 2. 检查 elFinder 是否加载成功
             if (typeof $().elfinder !== 'function') {
                 console.error('elFinder plugin not loaded');
-                $('#elfinder').html('<div style="color:white;padding:20px;text-align:center"><h3>elFinder 加载失败</h3><p>请检查网络连接，确保能够访问 cdnjs.cloudflare.com</p></div>');
+                $('#elfinder').html('<div style="color:white;padding:20px;text-align:center"><h3>elFinder 加载失败</h3><p>请检查本地资源文件比如 /vendor/elfinder 目录是否完整</p></div>');
                 return;
             }
 
@@ -169,7 +196,8 @@
                         'archive', 'extract', '|', 'info'
                     ]
                 },
-                ui: ['toolbar', 'tree', 'path', 'stat'],
+                // [适配] 移动端移除 tree 视图
+                ui: $(window).width() < 768 ? ['toolbar', 'path', 'stat'] : ['toolbar', 'tree', 'path', 'stat'],
                 uiOptions: {
                     toolbar: [
                         ['back', 'forward'],

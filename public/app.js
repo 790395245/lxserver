@@ -6,6 +6,7 @@ class App {
         this.currentView = 'dashboard';
         this.users = [];
         this.init();
+        this.initVersion();
     }
 
     init() {
@@ -105,6 +106,50 @@ class App {
 
         // [新增] 绑定上传事件
         document.getElementById('snapshot-upload-input')?.addEventListener('change', (e) => this.handleSnapshotUpload(e));
+
+        // Mobile Menu Events
+        this.initMobileEvents();
+    }
+
+    initMobileEvents() {
+        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+        const mobileSidebarOverlay = document.getElementById('mobile-sidebar-overlay');
+        const sidebar = document.querySelector('.sidebar');
+
+        const toggleMobileSidebar = () => {
+            if (!sidebar || !mobileSidebarOverlay) return;
+
+            sidebar.classList.toggle('active');
+            mobileSidebarOverlay.classList.toggle('active');
+
+            if (mobileSidebarOverlay.classList.contains('active')) {
+                mobileSidebarOverlay.classList.remove('hidden');
+            } else {
+                // Wait for animation to finish before hiding
+                setTimeout(() => {
+                    if (!mobileSidebarOverlay.classList.contains('active')) {
+                        mobileSidebarOverlay.classList.add('hidden');
+                    }
+                }, 300);
+            }
+        };
+
+        if (mobileMenuBtn) {
+            mobileMenuBtn.addEventListener('click', toggleMobileSidebar);
+        }
+
+        if (mobileSidebarOverlay) {
+            mobileSidebarOverlay.addEventListener('click', toggleMobileSidebar);
+        }
+
+        // Close on nav click (mobile only)
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                if (window.innerWidth <= 768 && sidebar && sidebar.classList.contains('active')) {
+                    toggleMobileSidebar();
+                }
+            });
+        });
     }
 
     async installPWA() {
@@ -174,7 +219,8 @@ class App {
             logs: '系统日志',
             webdav: 'WebDAV同步',
             files: '文件管理',
-            snapshots: '快照管理'
+            snapshots: '快照管理',
+            about: '关于'
         };
         document.getElementById('page-title').textContent = titles[viewName] || viewName;
 
@@ -200,8 +246,11 @@ class App {
             case 'webdav':
                 this.loadSyncLogs();
                 break;
-            case 'snapshots':      // <--- 添加这一段
+            case 'snapshots':
                 this.loadSnapshots();
+                break;
+            case 'about':
+                this.loadAbout();
                 break;
             case 'files':
                 // 跳转到新的 elFinder 文件管理器
@@ -225,6 +274,39 @@ class App {
             case 'edit-config':
                 this.switchView('config');
                 break;
+        }
+    }
+
+    async loadAbout() {
+        const container = document.getElementById('about-content');
+        if (!container) return;
+
+        try {
+            const response = await fetch('/about.md');
+            if (!response.ok) throw new Error('Failed to load about.md');
+            const text = await response.text();
+
+            if (window.marked) {
+                // Replace version placeholder
+                const version = (window.CONFIG && window.CONFIG.version) || 'v1.0.0';
+                const content = text.replace(/{{version}}/g, version);
+                container.innerHTML = window.marked.parse(content);
+            } else {
+                container.innerText = text;
+            }
+        } catch (e) {
+            console.error('Failed to load about content:', e);
+            container.innerHTML = '<p style="color: var(--accent-error); text-align: center;">加载关于页面失败</p>';
+        }
+    }
+
+    initVersion() {
+        if (window.CONFIG && window.CONFIG.version) {
+            const versionEl = document.getElementById('console-version');
+            if (versionEl) {
+                versionEl.textContent = window.CONFIG.version;
+                versionEl.classList.remove('hidden');
+            }
         }
     }
 

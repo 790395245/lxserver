@@ -251,7 +251,48 @@ function switchTab(tabId) {
             loadCustomSources();
         }
     }
+
+    if (tabId === 'about') {
+        document.getElementById('page-title').innerText = '关于';
+        loadAboutContent();
+    }
 }
+
+// Load About Content
+async function loadAboutContent() {
+    const aboutContainer = document.getElementById('about-content');
+    if (!aboutContainer) return;
+
+    try {
+        const response = await fetch('/music/about.md');
+        if (!response.ok) throw new Error('Failed to load about.md');
+        const text = await response.text();
+
+        // Render Markdown
+        if (window.marked) {
+            // Replace {{version}} placeholder
+            const version = (window.CONFIG && window.CONFIG.version) || 'v1.0.0';
+            const content = text.replace(/{{version}}/g, version);
+            aboutContainer.innerHTML = window.marked.parse(content);
+        } else {
+            aboutContainer.innerText = text; // Fallback
+        }
+        aboutContainer.classList.remove('animate-pulse');
+    } catch (e) {
+        console.error('Failed to load about content:', e);
+        aboutContainer.innerHTML = '<p class="text-red-500">加载关于页面失败，请稍后重试。</p>';
+    }
+}
+
+// Set Version on Load
+document.addEventListener('DOMContentLoaded', () => {
+    if (window.CONFIG && window.CONFIG.version) {
+        const versionEl = document.getElementById('app-version');
+        if (versionEl) {
+            versionEl.innerText = window.CONFIG.version + ' Web';
+        }
+    }
+});
 
 // Search Logic
 function handleSearchKeyPress(e) {
@@ -366,8 +407,10 @@ let hotSearchCacheTime = 0;
 const HOT_SEARCH_CACHE_DURATION = 5 * 60 * 1000; // 5分钟缓存
 
 async function fetchHotSearch(source = 'mg') {
-    // 检查缓存
-    if (hotSearchCache && Date.now() - hotSearchCacheTime < HOT_SEARCH_CACHE_DURATION) {
+    // 检查缓存（必须匹配 source）
+    if (hotSearchCache &&
+        hotSearchCache.source === source && // Add checking source
+        Date.now() - hotSearchCacheTime < HOT_SEARCH_CACHE_DURATION) {
         return hotSearchCache;
     }
 
@@ -380,6 +423,9 @@ async function fetchHotSearch(source = 'mg') {
 
         // 更新缓存
         hotSearchCache = data;
+        // Ensure data also carries the source info if not present
+        if (!hotSearchCache.source) hotSearchCache.source = source;
+
         hotSearchCacheTime = Date.now();
 
         return data;
@@ -422,7 +468,7 @@ function renderHotSearch(data) {
             <div class="hot-search-list grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                 ${keywords.map((keyword, index) => `
                     <button onclick="handleHotSearchClick('${keyword.replace(/'/g, "\\'")}')" 
-                            class="hot-search-item group flex items-center p-3 bg-white hover:bg-emerald-50 border border-gray-200 hover:border-emerald-400 rounded-lg transition-all shadow-sm hover:shadow-md">
+                            class="hot-search-item group flex items-center p-3 bg-white hover:bg-emerald-50 border border-gray-200 hover:border-emerald-400 rounded-lg transition-all shadow-sm hover:shadow-md overflow-hidden h-14">
                         <span class="rank flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold mr-3 ${index < 3 ? 'bg-gradient-to-r from-orange-400 to-red-500 text-white' : 'bg-gray-100 text-gray-500'
         }">
                             ${index + 1}
@@ -435,7 +481,7 @@ function renderHotSearch(data) {
                 `).join('')}
             </div>
             <div class="mt-6 text-center">
-                <button onclick="location.reload()" 
+                <button onclick="showInitialSearchState()" 
                         class="text-sm text-gray-400 hover:text-emerald-500 transition-colors">
                     <i class="fas fa-sync-alt mr-1"></i>
                     刷新热搜
@@ -443,6 +489,28 @@ function renderHotSearch(data) {
             </div>
         </div>
     `;
+
+    // 动态检测溢出并应用滚动效果
+    setTimeout(() => {
+        const items = container.querySelectorAll('.hot-search-item .keyword');
+        items.forEach(el => {
+            if (el.scrollWidth > el.clientWidth) {
+                const text = el.textContent.trim();
+                el.classList.remove('truncate');
+                // 使用 mask-image 实现渐变列表
+                el.innerHTML = `
+                    <div class="w-full overflow-hidden relative" style="mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%); -webkit-mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);">
+                        <div class="inline-block whitespace-nowrap animate-marquee hover-scroll-paused" style="will-change: transform;">
+                             <span>${text}</span>
+                             <span class="mx-8"></span>
+                             <span>${text}</span>
+                             <span class="mx-8"></span>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+    }, 0);
 }
 
 function handleHotSearchClick(keyword) {
@@ -471,7 +539,10 @@ function showInitialSearchState() {
     `;
 
     // 异步获取并显示热搜
-    fetchHotSearch('mg').then(data => {
+    const sourceSelect = document.getElementById('search-source');
+    const source = sourceSelect ? sourceSelect.value : 'wy';
+
+    fetchHotSearch(source).then(data => {
         renderHotSearch(data);
     }).catch(err => {
         console.error('[HotSearch] 显示热搜失败:', err);
@@ -748,11 +819,30 @@ function lazyLoadImages() {
 // Playback Logic
 
 let currentQuality = '128k'; // 当前播放音质
+let hintTimeout = null;
 
 async function playSong(song, index, forceQuality = null) {
     currentIndex = index;
     currentPlayingSong = song;
     updatePlayerInfo(song);
+
+    // 处理切换提示的显示与隐藏
+    const hint = document.getElementById('toggle-hint');
+    if (hint) {
+        // 重置为可见：清理内联样式，恢复 CSS 类定义的默认状态 (opacity-80, max-h-8, mt-2)
+        hint.style.opacity = '';
+        hint.style.maxHeight = '';
+        hint.style.marginTop = '';
+        hint.classList.remove('opacity-0');
+
+        if (hintTimeout) clearTimeout(hintTimeout);
+        hintTimeout = setTimeout(() => {
+            // 强制使用内联样式隐藏并收起占位
+            hint.style.opacity = '0';
+            hint.style.maxHeight = '0px';
+            hint.style.marginTop = '0px';
+        }, 5000);
+    }
 
     // 显示加载状态
     setPlayerStatus('正在获取播放链接...');
@@ -1163,6 +1253,10 @@ function setPlayMode(mode) {
         'order': '顺序播放'
     };
 
+    // Close menu (Mobile/Click mode)
+    const menu = document.getElementById('play-mode-menu');
+    if (menu) menu.classList.remove('force-visible');
+
     const toast = document.createElement('div');
     toast.className = 'fixed bottom-28 right-4 bg-emerald-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
     toast.innerHTML = `<i class="fas fa-check-circle mr-2"></i>${modeNames[mode]}`;
@@ -1173,6 +1267,24 @@ function setPlayMode(mode) {
         setTimeout(() => toast.remove(), 300);
     }, 1500);
 }
+
+// 切换播放模式菜单（适配移动端点击）
+function togglePlayModeMenu(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('play-mode-menu');
+    if (menu) {
+        menu.classList.toggle('force-visible');
+    }
+}
+
+// 监听全局点击，关闭菜单
+document.addEventListener('click', (e) => {
+    const menu = document.getElementById('play-mode-menu');
+    const btn = document.getElementById('play-mode-btn');
+    if (menu && btn && !menu.contains(e.target) && !btn.contains(e.target)) {
+        menu.classList.remove('force-visible');
+    }
+});
 
 // 更新播放模式 UI
 function updatePlayModeUI() {
@@ -2365,7 +2477,7 @@ async function handleFileUpload(input) {
     }
 
     // 更新文件名显示
-    document.getElementById('file-name-display').textContent = file.name;
+    // document.getElementById('file-name-display').textContent = file.name;
 
     try {
         // 读取文件内容
@@ -2382,7 +2494,7 @@ async function handleFileUpload(input) {
         if (!validation.valid) {
             showError(`脚本无效: ${validation.error}`);
             input.value = '';
-            document.getElementById('file-name-display').textContent = '点击选择 .js 文件';
+            // document.getElementById('file-name-display').textContent = '点击选择 .js 文件';
             return;
         }
 
@@ -2394,7 +2506,7 @@ async function handleFileUpload(input) {
 
         // 重置输入
         input.value = '';
-        document.getElementById('file-name-display').textContent = '点击选择 .js 文件';
+        // document.getElementById('file-name-display').textContent = '点击选择 .js 文件';
 
         // 刷新源列表
         loadCustomSources();
@@ -3164,6 +3276,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // 恢复其他设置
     loadSettings();
 
+    // 监听源切换，自动刷新热搜
+    const searchSourceSelect = document.getElementById('search-source');
+    if (searchSourceSelect) {
+        searchSourceSelect.addEventListener('change', () => {
+            const searchInput = document.getElementById('search-input');
+            // 仅当搜索框为空（即处于显示热搜状态）时刷新
+            if (!searchInput || !searchInput.value.trim()) {
+                showInitialSearchState();
+            }
+        });
+    }
+
     // [Fix] Auto-Login logic (Restore Session)
     const savedMode = localStorage.getItem('lx_sync_mode');
     if (savedMode === 'local') {
@@ -3258,3 +3382,37 @@ window.addEventListener('resize', () => {
         }
     }
 });
+
+// 切换详情页封面显示（移动端优化）
+function toggleDetailCover() {
+    const cover = document.getElementById('mobile-player-cover-container');
+    const container = document.getElementById('player-detail-container');
+
+    if (!cover || !container) return;
+
+    // Toggle state based on class presence
+    const isHidden = cover.classList.contains('opacity-0');
+
+    if (!isHidden) {
+        // Hide Cover
+        // We set max-height to 0 to collapse it smoothly
+        cover.style.maxHeight = '0px';
+        cover.classList.remove('mb-8', 'md:mb-0');
+        // Fade out and shrink
+        cover.classList.add('opacity-0', 'scale-90', 'border-0');
+
+        // Move container UP by reducing top padding
+        container.classList.remove('pt-24');
+        container.classList.add('pt-8'); // Less padding on top
+
+    } else {
+        // Show Cover
+        cover.style.maxHeight = ''; // Remove inline style to revert to CSS class
+        // Restore styles
+        cover.classList.remove('opacity-0', 'scale-90', 'border-0');
+
+        // Restore padding
+        container.classList.add('pt-24');
+        container.classList.remove('pt-8');
+    }
+}

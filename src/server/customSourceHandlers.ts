@@ -23,20 +23,20 @@ export async function handleValidate(req: IncomingMessage, res: ServerResponse) 
             throw new Error('Invalid script content')
         }
 
-        // 基本格式检查
-        if (!script.includes('lx.on') || !script.includes('lx.send')) {
-            throw new Error('脚本必须包含 lx.on 和 lx.send 调用,这不是有效的洛雪音乐自定义源脚本')
-        }
+        // 基本格式检查 - 移除静态检查以支持混淆脚本
+        // if (!script.includes('lx.on') || !script.includes('lx.send')) {
+        //     throw new Error('脚本必须包含 lx.on 和 lx.send 调用,这不是有效的洛雪音乐自定义源脚本')
+        // }
 
         const metadata = extractMetadata(script)
 
         // 检查必要的元数据
-        if (!metadata.name) {
-            throw new Error('脚本必须包含 @name 元数据')
-        }
-        if (!metadata.version) {
-            throw new Error('脚本必须包含 @version 元数据')
-        }
+        // if (!metadata.name) {
+        //     throw new Error('脚本必须包含 @name 元数据')
+        // }
+        // if (!metadata.version) {
+        //     throw new Error('脚本必须包含 @version 元数据')
+        // }
 
         // 尝试加载验证
         const result = await loadUserApi({
@@ -135,7 +135,7 @@ export async function handleUpload(req: IncomingMessage, res: ServerResponse) {
         // 更新元数据
         sources.push({
             id,
-            name: metadata.name,
+            name: metadata.name || filename,
             version: metadata.version,
             author: metadata.author,
             description: metadata.description,

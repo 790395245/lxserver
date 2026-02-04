@@ -5,9 +5,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LX Music Web</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" href="/music/assets/logo.svg" type="image/svg+xml">
+    <link rel="manifest" href="/music/manifest.json">
+    <script src="/music/assets/tailwindcss.js"></script>
     <link rel="stylesheet" href="/music/assets/fontawesome/css/all.min.css">
     <script src="/music/js/crypto-js.min.js"></script>
+    <script src="/music/js/config.js"></script>
+    <script src="/music/js/marked.min.js"></script>
     <style>
         /* Custom scrollbar */
         ::-webkit-scrollbar {
@@ -119,6 +123,27 @@
         .animate-marquee {
             display: inline-block;
             animation: marquee 10s linear infinite;
+        }
+
+        /* Default: Always Run (for Touch/Mobile) */
+        .hover-scroll-paused {
+            animation-play-state: running;
+        }
+
+        /* Desktop: Pause by default, run on hover */
+        @media (hover: hover) {
+            .hover-scroll-paused {
+                animation-play-state: paused;
+            }
+
+            .group:hover .hover-scroll-paused {
+                animation-play-state: running;
+            }
+        }
+
+        .force-visible {
+            opacity: 1 !important;
+            visibility: visible !important;
         }
     </style>
 </head>
@@ -240,6 +265,13 @@
                             <span class="ml-3 font-medium">设置</span>
                         </a>
                     </li>
+                    <li>
+                        <a href="#" onclick="switchTab('about')" id="tab-about"
+                            class="flex items-center px-6 py-3 text-gray-600 hover:bg-gray-50 transition-colors duration-200">
+                            <i class="fas fa-info-circle w-6 text-center"></i>
+                            <span class="ml-3 font-medium">关于</span>
+                        </a>
+                    </li>
                 </ul>
             </nav>
 
@@ -267,11 +299,18 @@
                 </div>
 
                 <div class="flex items-center gap-4">
+                    <!-- PWA Install Button -->
+                    <button id="pwa-install-btn"
+                        class="hidden items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm">
+                        <i class="fas fa-download"></i>
+                        <span class="hidden sm:inline">安装应用</span>
+                    </button>
+
                     <a href="https://github.com/XCQ0607/lxserver" target="_blank"
                         class="text-gray-400 hover:text-gray-600 transition-colors" title="GitHub">
                         <i class="fab fa-github text-xl"></i>
                     </a>
-                    <div class="text-sm text-gray-400 hidden sm:block">v1.0.0 Web</div>
+                    <div class="text-sm text-gray-400" id="app-version">v1.0.0 Web</div>
                 </div>
             </header>
 
@@ -515,6 +554,20 @@
                     </div>
                 </div>
             </div>
+
+            <!-- About View -->
+            <div id="view-about"
+                class="absolute inset-0 overflow-y-auto custom-scrollbar p-6 hidden opacity-0 transition-opacity duration-300">
+                <div
+                    class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 max-w-3xl mx-auto w-full prose prose-emerald">
+                    <div id="about-content" class="animate-pulse">
+                        <div class="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
+                        <div class="h-4 bg-gray-200 rounded w-full mb-2"></div>
+                        <div class="h-4 bg-gray-200 rounded w-full mb-2"></div>
+                        <div class="h-4 bg-gray-200 rounded w-2/3"></div>
+                    </div>
+                </div>
+            </div>
     </div>
 
     </div>
@@ -545,12 +598,13 @@
         </div>
 
         <!-- Main Content -->
-        <div
-            class="relative z-10 flex-1 flex flex-col md:flex-row items-center justify-start md:justify-center gap-8 md:gap-20 px-8 pt-24 md:pt-0 pb-32 overflow-hidden">
+        <!-- Main Content -->
+        <div id="player-detail-container"
+            class="relative z-10 flex-1 flex flex-col md:flex-row items-center justify-start md:justify-center gap-8 md:gap-20 px-8 pt-24 md:pt-0 pb-32 overflow-hidden transition-all duration-300 ease-out">
 
             <!-- Left: Image -->
-            <div
-                class="w-auto h-auto max-w-[60vw] max-h-[40vh] aspect-square md:w-[28rem] md:h-[28rem] md:max-w-none md:max-h-none flex-shrink-0 shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-3xl overflow-hidden transition-all duration-700 hover:scale-105 border-4 border-white/20">
+            <div id="mobile-player-cover-container"
+                class="w-auto h-auto max-w-[48vw] max-h-[32vh] aspect-square md:w-[28rem] md:h-[28rem] md:max-w-none md:max-h-none flex-shrink-0 shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-3xl overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] border-4 border-white/20 origin-top bg-gray-100">
                 <img id="detail-cover" src="/music/assets/logo.svg" onerror="this.src='/music/assets/logo.svg'"
                     class="w-full h-full object-cover">
             </div>
@@ -558,14 +612,19 @@
             <!-- Right: Lyrics -->
             <div class="w-full md:w-1/2 h-full max-h-[60vh] flex flex-col relative">
                 <!-- Song Info -->
-                <div class="mb-8 text-center md:text-left px-4 md:px-0">
-                    <div id="detail-title-container" class="w-full overflow-hidden whitespace-nowrap mb-2">
+                <div class="mb-4 md:mb-8 text-center md:text-left px-4 md:px-0 cursor-pointer transition-all duration-300 active:scale-95 select-none"
+                    onclick="toggleDetailCover()" title="点击切换封面显示">
+                    <div id="detail-title-container" class="w-full overflow-hidden whitespace-nowrap mb-1">
                         <div id="detail-title"
-                            class="inline-block text-3xl md:text-4xl font-black text-gray-800 drop-shadow-sm min-w-full">
+                            class="inline-block text-2xl md:text-4xl font-black text-gray-800 drop-shadow-sm min-w-full">
                             Song Name
                         </div>
                     </div>
-                    <div id="detail-artist" class="text-lg md:text-xl text-gray-600 font-medium truncate">Artist</div>
+                    <div id="detail-artist" class="text-base md:text-xl text-gray-600 font-medium truncate">Artist</div>
+                    <div id="toggle-hint"
+                        class="md:hidden text-[10px] text-emerald-500/60 mt-2 font-mono tracking-widest opacity-80 transition-all duration-1000 overflow-hidden max-h-8">
+                        <i class="fas fa-chevron-up text-xs animate-bounce mr-1"></i>点击标题切换封面
+                    </div>
                 </div>
 
                 <!-- Scroll Indicator - 固定参考线 -->
@@ -587,7 +646,7 @@
                     style="scroll-behavior: smooth;" onwheel="handleLyricScroll()">
 
                     <div id="lyric-content"
-                        class="flex flex-col items-center md:items-start text-center md:text-left gap-6 py-[40vh] transition-transform duration-300 ease-out">
+                        class="flex flex-col items-center md:items-start text-center md:text-left gap-3 md:gap-6 py-[40vh] transition-transform duration-300 ease-out">
                         <!-- Lines injected here -->
                         <p class="text-gray-400 text-lg font-medium">暂无歌词</p>
                     </div>
@@ -649,8 +708,8 @@
             <div class="flex items-center gap-6 md:gap-6 w-full justify-center md:mb-2">
                 <!-- Play Mode Button with Dropdown -->
                 <div class="relative group">
-                    <button id="play-mode-btn" class="text-gray-400 hover:text-emerald-500 transition-colors p-2"
-                        title="播放模式">
+                    <button id="play-mode-btn" onclick="togglePlayModeMenu(event)"
+                        class="text-gray-400 hover:text-emerald-500 transition-colors p-2" title="播放模式">
                         <i class="fas fa-redo"></i>
                     </button>
                     <!-- Dropdown Menu -->
@@ -870,6 +929,7 @@
     <script src="/music/js/user_sync.js"></script>
     <script src="/music/js/batch_pagination.js"></script>
     <script src="/music/js/single_song_ops.js"></script>
+    <script src="/music/js/pwa.js"></script>
     <script src="/music/app.js"></script>
 </body>
 
