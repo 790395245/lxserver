@@ -13,7 +13,6 @@ env:
 jobs:
   build_and_push:
     runs-on: ubuntu-latest
-    # 需要写入 packages 的权限
     permissions:
       contents: read
       packages: write
@@ -22,6 +21,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Add QEMU for multi-platform build
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Log in to the Container registry
         uses: docker/login-action@v3
         with:
@@ -29,10 +35,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      # Extract project version from config.js
+      - name: Read version from config
+        id: get_version
+        run: |
+          VERSION=$(grep "version:" public/config.js | sed "s/.*'\(.*\)'.*/\1/")
+          echo "PROJECT_VERSION=$VERSION" >> $GITHUB_ENV
 
-      # 使用 metadata-action 自动处理 tags 和 labels，并强制转换为小写
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v5
@@ -40,7 +49,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest
-            type=sha
+            type=raw,value=${{ env.PROJECT_VERSION }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -48,6 +57,8 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
+          # Enable multi-platform build
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha

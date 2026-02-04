@@ -34,7 +34,18 @@ jobs:
       - name: Create archive
         run: |
           mkdir -p release/lx-music-sync-server
-          cp -r server public index.js package.json ecosystem.config.js LICENSE README.md config.js release/lx-music-sync-server/
+          
+          # Copy core files
+          cp -r server public index.js package.json release/lx-music-sync-server/
+          
+          # Copy config files if they exist
+          [ -f "ecosystem.config.js" ] && cp ecosystem.config.js release/lx-music-sync-server/
+          [ -f "config.js" ] && cp config.js release/lx-music-sync-server/
+          
+          # Copy documentation/license if they exist
+          [ -f "LICENSE" ] && cp LICENSE release/lx-music-sync-server/
+          [ -f "README.md" ] && cp README.md release/lx-music-sync-server/
+          
           cd release
           zip -r lx-music-sync-server-${{ env.PROJECT_VERSION }}.zip lx-music-sync-server
 

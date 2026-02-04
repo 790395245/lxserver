@@ -100,18 +100,19 @@ npm start
 
 #### 方式二：使用 Docker (推荐)
 
-```bash
-# 构建镜像
-docker build -t lx-music-sync-server .
+直接使用官方构建的镜像（支持 amd64/arm64）：
 
-# 运行容器
+```bash
 docker run -d \
   -p 9527:9527 \
   -v $(pwd)/data:/app/data \
   -v $(pwd)/logs:/app/logs \
   --name lx-sync-server \
-  lx-music-sync-server
+  --restart unless-stopped \
+  ghcr.io/xcq0607/lxserver:latest
 ```
+
+也可以指定特定版本：`ghcr.io/xcq0607/lxserver:v1.0.0`
 
 #### 方式三：使用 Release 版本 (手动部署)
 
