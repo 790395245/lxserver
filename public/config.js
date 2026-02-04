@@ -1,3 +1,3 @@
-const CONFIG = {
-    version: 'v1.0.3'
+window.CONFIG = {
+    version: 'v1.0.4'
 };

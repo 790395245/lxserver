@@ -347,6 +347,10 @@ async function doSearch(page = 1) {
     resultsContainer.innerHTML = '<div class="flex items-center justify-center h-full"><i class="fas fa-spinner fa-spin text-4xl text-emerald-500"></i></div>';
 
     try {
+        const headers = {};
+        if (typeof authToken !== 'undefined' && authToken) headers['x-user-token'] = authToken;
+        if (typeof currentListData !== 'undefined' && currentListData && currentListData.username) headers['x-user-name'] = currentListData.username;
+
         let list = [];
         if (source === 'all') {
             // Aggregate Search
@@ -354,7 +358,7 @@ async function doSearch(page = 1) {
             if (pageInfoEl) pageInfoEl.innerText = `聚合搜索 (前20条/源)`;
 
             const promises = SOURCES.map(s =>
-                fetch(`${API_BASE}/search?name=${encodeURIComponent(input)}&source=${s}&page=1`)
+                fetch(`${API_BASE}/search?name=${encodeURIComponent(input)}&source=${s}&page=1`, { headers })
                     .then(res => res.json())
                     .then(data => data.map(item => ({ ...item, source: s })))
                     .catch(e => {
@@ -366,7 +370,7 @@ async function doSearch(page = 1) {
             list = results.flat();
         } else {
             // Single Source Search - 使用老版本简单逻辑
-            const res = await fetch(`${API_BASE}/search?name=${encodeURIComponent(input)}&source=${source}&page=${page}`);
+            const res = await fetch(`${API_BASE}/search?name=${encodeURIComponent(input)}&source=${source}&page=${page}`, { headers });
 
             if (!res.ok) {
                 throw new Error(`搜索请求失败: ${res.status} ${res.statusText}`);
@@ -861,9 +865,13 @@ async function playSong(song, index, forceQuality = null) {
 
         console.log(`[Player] 播放歌曲: ${song.name} - ${song.singer} [${quality}]`);
 
+        const headers = { 'Content-Type': 'application/json' };
+        if (typeof authToken !== 'undefined' && authToken) headers['x-user-token'] = authToken;
+        if (typeof currentListData !== 'undefined' && currentListData && currentListData.username) headers['x-user-name'] = currentListData.username;
+
         const res = await fetch(`${API_BASE}/url`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({ songInfo: song, quality })
         });
 
@@ -1482,7 +1490,12 @@ async function fetchLyric(song) {
         });
 
         const url = `${API_BASE}/lyric?${params.toString()}`;
-        const res = await fetch(url);
+
+        const headers = {};
+        if (typeof authToken !== 'undefined' && authToken) headers['x-user-token'] = authToken;
+        if (typeof currentListData !== 'undefined' && currentListData && currentListData.username) headers['x-user-name'] = currentListData.username;
+
+        const res = await fetch(url, { headers });
 
         if (!res.ok) {
             throw new Error(`Fetch lyric failed: ${res.status}`);
