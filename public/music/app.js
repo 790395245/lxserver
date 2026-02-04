@@ -831,6 +831,7 @@ async function playSong(song, index, forceQuality = null) {
     currentIndex = index;
     currentPlayingSong = song;
     updatePlayerInfo(song);
+    updateMediaSessionMetadata(song);
 
     // 处理切换提示的显示与隐藏
     const hint = document.getElementById('toggle-hint');
@@ -1170,10 +1171,111 @@ audio.addEventListener('timeupdate', () => {
     document.getElementById('progress-bar').style.width = `${pct}%`;
 });
 
+// Update Media Session State on Play/Pause
+audio.addEventListener('play', () => {
+    if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'playing';
+        updatePositionState();
+    }
+});
+
+audio.addEventListener('pause', () => {
+    if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'paused';
+        updatePositionState();
+    }
+});
+
+function updatePositionState() {
+    if ('mediaSession' in navigator && navigator.mediaSession.setPositionState) {
+        if (audio.duration && !isNaN(audio.duration)) {
+            try {
+                navigator.mediaSession.setPositionState({
+                    duration: audio.duration,
+                    playbackRate: audio.playbackRate,
+                    position: audio.currentTime
+                });
+            } catch (e) {
+                console.warn('[MediaSession] Failed to update position state:', e);
+            }
+        }
+    }
+}
+
 // 歌曲播放结束时根据播放模式处理
 audio.addEventListener('ended', () => {
     playNext();
 });
+
+// Additional events to sync progress
+audio.addEventListener('loadedmetadata', updatePositionState);
+audio.addEventListener('ratechange', updatePositionState);
+audio.addEventListener('seeked', updatePositionState);
+
+// Initialize Media Session Actions
+if ('mediaSession' in navigator) {
+    navigator.mediaSession.setActionHandler('play', () => {
+        togglePlay();
+    });
+    navigator.mediaSession.setActionHandler('pause', () => {
+        togglePlay();
+    });
+    navigator.mediaSession.setActionHandler('previoustrack', () => {
+        playPrev();
+    });
+    navigator.mediaSession.setActionHandler('nexttrack', () => {
+        playNext();
+    });
+
+    // Support seeking (Bidirectional Progress Control)
+    navigator.mediaSession.setActionHandler('seekto', (details) => {
+        if (details.seekTime != null) {
+            audio.currentTime = details.seekTime;
+            updatePositionState();
+        }
+    });
+
+    navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+        const skipTime = details.seekOffset || 10;
+        audio.currentTime = Math.max(audio.currentTime - skipTime, 0);
+        updatePositionState();
+    });
+
+    navigator.mediaSession.setActionHandler('seekforward', (details) => {
+        const skipTime = details.seekOffset || 10;
+        audio.currentTime = Math.min(audio.currentTime + skipTime, audio.duration);
+        updatePositionState();
+    });
+}
+
+function updateMediaSessionMetadata(song) {
+    if (!('mediaSession' in navigator)) return;
+
+    const imgUrl = getImgUrl(song);
+    // Ensure absolute URL if possible
+    const fullImgUrl = new URL(imgUrl, window.location.href).href;
+
+    try {
+        navigator.mediaSession.metadata = new MediaMetadata({
+            title: song.name,
+            artist: song.singer,
+            album: song.albumName || '',
+            artwork: [
+                { src: fullImgUrl, sizes: '96x96', type: 'image/jpeg' },
+                { src: fullImgUrl, sizes: '128x128', type: 'image/jpeg' },
+                { src: fullImgUrl, sizes: '192x192', type: 'image/jpeg' },
+                { src: fullImgUrl, sizes: '256x256', type: 'image/jpeg' },
+                { src: fullImgUrl, sizes: '384x384', type: 'image/jpeg' },
+                { src: fullImgUrl, sizes: '512x512', type: 'image/jpeg' }
+            ]
+        });
+        // Reset playback state logic is handled by event listeners, but metadata update often implies new song start
+        // updatePositionState() will be called when loadedmetadata fires for new source
+    } catch (e) {
+        console.warn('[MediaSession] Failed to update metadata:', e);
+    }
+}
+
 
 function seek(e) {
     const container = document.getElementById('progress-container');
