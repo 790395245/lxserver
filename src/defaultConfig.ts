@@ -1,9 +1,9 @@
 
 const config: LX.Config = {
-  serverName: 'My Sync Server', // 同步服务名称
+  serverName: 'lxserver', // 同步服务名称
   'proxy.enabled': false, // 是否使用代理转发请求到本服务器
   'proxy.header': 'x-real-ip', // 代理转发的请求头 原始IP
-  bindIP: '127.0.0.1', // 绑定IP
+  bindIP: '0.0.0.0', // 绑定IP
   port: 9527, // 端口
   'user.enablePath': true, // 是否开启用户路径
   'user.enableRoot': false, // 是否开启根路径

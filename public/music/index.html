@@ -54,6 +54,11 @@
             -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
         }
 
+        .mask-image-linear-fade {
+            mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
+            -webkit-mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
+        }
+
         .no-scrollbar::-webkit-scrollbar {
             display: none;
         }
@@ -210,11 +215,11 @@
 
         <!-- Mobile Sidebar Backdrop -->
         <div id="mobile-sidebar-backdrop" onclick="toggleSidebar()"
-            class="fixed inset-0 bg-black/50 z-20 hidden md:hidden glass"></div>
+            class="fixed inset-0 bg-black/50 z-[55] hidden md:hidden glass"></div>
 
         <!-- Sidebar -->
         <aside id="main-sidebar"
-            class="w-64 bg-white shadow-lg flex flex-col z-30 absolute inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 h-full">
+            class="w-64 bg-white shadow-lg flex flex-col z-[60] fixed inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 md:z-30 h-full">
             <div class="h-16 flex items-center justify-center border-b border-gray-100 relative">
                 <img src="/music/assets/logo.svg" alt="LX" class="w-8 h-8 mr-2 rounded-lg shadow-sm">
                 <h1 class="text-xl font-bold text-emerald-600 tracking-wider">LX MUSIC</h1>
@@ -276,12 +281,14 @@
             </nav>
 
             <!-- Mini Player Info (Optional, cover art here) -->
-            <div id="sidebar-song-info" class="p-4 border-t border-gray-100 hidden">
-                <img id="sidebar-cover" src="/music/assets/logo.svg" onerror="this.src='/music/assets/logo.svg'"
-                    alt="Cover" class="w-full rounded-lg shadow-md mb-3">
-                <div class="text-center">
-                    <div id="sidebar-song-name" class="font-bold text-sm truncate">Song Name</div>
-                    <div id="sidebar-singer" class="text-xs text-gray-500 truncate">Artist</div>
+            <div class="hidden md:block">
+                <div id="sidebar-song-info" class="p-4 border-t border-gray-100 hidden">
+                    <img id="sidebar-cover" src="/music/assets/logo.svg" onerror="this.src='/music/assets/logo.svg'"
+                        alt="Cover" class="w-full rounded-lg shadow-md mb-3">
+                    <div class="text-center">
+                        <div id="sidebar-song-name" class="font-bold text-sm truncate">Song Name</div>
+                        <div id="sidebar-singer" class="text-xs text-gray-500 truncate">Artist</div>
+                    </div>
                 </div>
             </div>
         </aside>
@@ -319,7 +326,7 @@
 
                 <!-- Search View -->
                 <div id="view-search"
-                    class="absolute inset-0 flex flex-col p-2 md:p-6 overflow-hidden transition-opacity duration-300">
+                    class="absolute inset-0 flex flex-col p-2 pb-32 md:p-6 md:pb-6 overflow-hidden transition-all duration-300">
                     <!-- Search Input Area -->
                     <div class="flex flex-col md:flex-row gap-2 md:gap-4 mb-4 md:mb-6">
                         <!-- Search Input -->
@@ -428,7 +435,7 @@
 
             <!-- Favorites View -->
             <div id="view-favorites"
-                class="absolute inset-0 flex flex-col p-6 hidden opacity-0 transition-opacity duration-300">
+                class="absolute inset-0 flex flex-col p-6 pb-32 md:pb-6 hidden opacity-0 transition-all duration-300">
                 <div class="flex-1 flex flex-col items-center justify-center text-gray-400">
                     <i class="fas fa-heart-broken text-6xl opacity-20 mb-4"></i>
                     <h2 class="text-xl font-medium text-gray-500">敬请期待</h2>
@@ -438,7 +445,7 @@
 
             <!-- Settings View -->
             <div id="view-settings"
-                class="absolute inset-0 overflow-y-auto custom-scrollbar p-6 hidden opacity-0 transition-opacity duration-300">
+                class="absolute inset-0 overflow-y-auto custom-scrollbar p-6 pb-32 md:pb-6 hidden opacity-0 transition-all duration-300">
                 <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 max-w-2xl mx-auto w-full">
                     <h2 class="text-2xl font-bold text-gray-800 mb-6 border-b pb-4">设置</h2>
 
@@ -621,7 +628,7 @@
 
     <!-- Player Detail View (Overlay) -->
     <div id="view-player-detail"
-        class="fixed inset-0 z-30 bg-white hidden flex flex-col transition-all duration-500 transform translate-y-[100%] opacity-0">
+        class="fixed inset-0 z-30 bg-white hidden flex flex-col transition-all duration-500 transform translate-y-[100%] opacity-0 pb-24">
         <!-- Blurry Background -->
         <div class="absolute inset-0 overflow-hidden">
             <img id="detail-bg-cover" src=""
@@ -642,9 +649,8 @@
         </div>
 
         <!-- Main Content -->
-        <!-- Main Content -->
         <div id="player-detail-container"
-            class="relative z-10 flex-1 flex flex-col md:flex-row items-center justify-start md:justify-center gap-8 md:gap-20 px-4 md:px-8 pt-24 md:pt-0 pb-32 overflow-hidden transition-all duration-300 ease-out">
+            class="relative z-10 flex-1 flex flex-col md:flex-row items-center justify-start md:justify-center gap-8 md:gap-20 px-4 md:px-8 pt-24 md:pt-0 pb-6 overflow-hidden transition-all duration-300 ease-out">
 
             <!-- Left: Image -->
             <div id="mobile-player-cover-container"
@@ -654,7 +660,8 @@
             </div>
 
             <!-- Right: Lyrics -->
-            <div class="w-full md:w-1/2 h-full max-h-[60vh] flex flex-col relative">
+            <div id="lyrics-wrapper"
+                class="w-full md:w-1/2 h-full max-h-[60vh] flex flex-col relative transition-all duration-300">
                 <!-- Song Info -->
                 <div class="mb-4 md:mb-8 text-center md:text-left px-4 md:px-0 cursor-pointer transition-all duration-300 active:scale-95 select-none"
                     onclick="toggleDetailCover()" title="点击切换封面显示">
@@ -700,8 +707,8 @@
     </div>
 
     <!-- Player Bar -->
-    <footer
-        class="h-auto md:h-24 py-2 md:py-0 bg-white/90 backdrop-blur-lg border-t border-gray-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] flex flex-col md:flex-row items-center px-4 md:px-6 z-50 transition-all duration-300">
+    <footer id="player-footer"
+        class="fixed bottom-0 left-0 w-full md:relative h-auto md:h-24 py-2 md:py-0 bg-white/90 backdrop-blur-lg border-t border-gray-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] flex flex-col md:flex-row items-center px-4 md:px-6 z-50 transition-all duration-300">
 
         <!-- Song Info -->
         <div class="w-full md:w-1/4 flex items-center gap-3 md:gap-4 mb-2 md:mb-0">
@@ -749,7 +756,7 @@
                 <span id="time-total">00:00</span>
             </div>
 
-            <div class="flex items-center gap-6 md:gap-6 w-full justify-center md:mb-2">
+            <div class="flex items-center gap-6 md:gap-6 w-full justify-center md:mb-2 relative">
                 <!-- Play Mode Button with Dropdown -->
                 <div class="relative group">
                     <button id="play-mode-btn" onclick="togglePlayModeMenu(event)"
@@ -797,8 +804,12 @@
                 <button class="text-gray-600 hover:text-emerald-600 text-lg transition-colors p-2"
                     onclick="playNext()"><i class="fas fa-step-forward"></i></button>
 
-                <!-- Mobile Volume Toggle (Optional, can be hidden or moved) -->
-                <!-- Use same volume control but maybe hidden on very small screens if crowded -->
+                <!-- Collapse Panel Button (Mobile Only) -->
+                <button id="btn-collapse-panel"
+                    class="md:hidden absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 p-2 hover:text-gray-600"
+                    onclick="togglePlayerPanel()">
+                    <i class="fas fa-chevron-down text-lg"></i>
+                </button>
             </div>
         </div>
 
@@ -822,6 +833,13 @@
             </div>
         </div>
     </footer>
+
+    <!-- Expand Panel Button (Hidden by default, shown when panel is collapsed) -->
+    <!-- Expand Panel Button (Hidden by default, shown when panel is collapsed) -->
+    <button id="btn-expand-panel" onclick="togglePlayerPanel()"
+        class="md:hidden fixed bottom-20 right-6 z-40 w-12 h-12 flex items-center justify-center bg-white/80 backdrop-blur-md rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.12)] text-gray-500 hover:text-emerald-500 transform transition-all duration-300 translate-y-20 opacity-0 border border-white/50">
+        <i class="fas fa-chevron-up text-lg"></i>
+    </button>
 
     <!-- Sync Auth Modal -->
     <div id="sync-auth-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">

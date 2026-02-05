@@ -386,8 +386,11 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
                   const user = global.lx.config.users[idx]
 
                   // 保存用户数据路径（如果需要删除）
+                  console.log(`[DeleteUser] deleteData: ${deleteData}, user.dataPath: ${user.dataPath}`)
                   if (deleteData && user.dataPath) {
                     deletedUsers.push({ name: targetName, dataPath: user.dataPath })
+                  } else {
+                    console.log(`[DeleteUser] Skipping data deletion for ${targetName}. deleteData=${deleteData}, hasDataPath=${!!user.dataPath}`)
                   }
 
                   // 断开该用户的连接
@@ -406,17 +409,23 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
 
                 // 如果需要删除数据文件夹
                 if (deleteData && deletedUsers.length > 0) {
+                  console.log(`[DeleteUser] Processing ${deletedUsers.length} data folders deletion...`)
                   for (const user of deletedUsers) {
                     try {
+                      console.log(`[DeleteUser] Checking path: ${user.dataPath}`)
                       if (fs.existsSync(user.dataPath)) {
                         fs.rmSync(user.dataPath, { recursive: true, force: true })
                         console.log(`Deleted user data folder: ${user.dataPath}`)
+                      } else {
+                        console.log(`[DeleteUser] Path not found: ${user.dataPath}`)
                       }
                     } catch (err) {
                       console.error(`Failed to delete user data folder for ${user.name}:`, err)
                       // 继续删除其他用户，不中断流程
                     }
                   }
+                } else {
+                  console.log('[DeleteUser] No data folders to delete (or deleteData is false)')
                 }
 
                 res.writeHead(200)

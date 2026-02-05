@@ -588,23 +588,30 @@ function showInitialSearchState() {
 
 function getQualityTags(item) {
     const tags = [];
-    const types = item.types || item._types || {};
-    // Check various formats based on different source returns
-    // Simplified check: usually types is array or object with keys like '320k', 'flac'
+    // 兼容多种音质字段位置:
+    // 1. types / _types (旧版/部分源)
+    // 2. qualitys / _qualitys (新版/标准)
+    // 3. meta.qualitys (收藏列表)
+    const rawTypes = item.types || item._types ||
+        item.qualitys || item._qualitys ||
+        (item.meta && (item.meta.qualitys || item.meta._qualitys)) ||
+        {};
 
     // Normalize types check
     let has320 = false;
     let hasFlac = false;
     let hasHiRes = false;
 
-    if (Array.isArray(types)) {
-        has320 = types.some(t => t.type === '320k');
-        hasFlac = types.some(t => t.type === 'flac');
-        hasHiRes = types.some(t => t.type === 'flac24bit');
+    if (Array.isArray(rawTypes)) {
+        // 数组格式: [{type: '320k', ...}, {type: 'flac', ...}]
+        has320 = rawTypes.some(t => t.type === '320k');
+        hasFlac = rawTypes.some(t => t.type === 'flac');
+        hasHiRes = rawTypes.some(t => t.type === 'flac24bit');
     } else {
-        has320 = !!types['320k'];
-        hasFlac = !!types['flac'];
-        hasHiRes = !!types['flac24bit'];
+        // 对象格式: { '320k': {size: ...}, 'flac': ... }
+        has320 = !!rawTypes['320k'];
+        hasFlac = !!rawTypes['flac'];
+        hasHiRes = !!rawTypes['flac24bit'];
     }
 
     if (hasHiRes) tags.push('<span class="px-1 py-0.5 rounded text-[10px] bg-yellow-100 text-yellow-700 border border-yellow-200 ml-1">HR</span>');
@@ -954,6 +961,8 @@ async function playSong(song, index, forceQuality = null) {
 
                 // 保存播放历史
                 savePlayHistory(song, currentQuality);
+                // 添加到默认列表 (播放历史/试听列表)
+                addToDefaultList(song);
 
                 console.log(`[Player] 播放成功: ${result.url.substring(0, 50)}...`);
             } catch (playError) {
@@ -1031,6 +1040,41 @@ function savePlayHistory(song, quality) {
         localStorage.setItem('play_history', JSON.stringify(history.slice(0, 50)));
     } catch (e) {
         console.error('[Player] 保存播放历史失败:', e);
+    }
+}
+
+// 添加到默认列表
+async function addToDefaultList(song) {
+    if (!currentListData || !currentListData.defaultList) return;
+
+    try {
+        const cleanedData = cleanSongData(song);
+        const targetId = cleanedData.id;
+        const list = currentListData.defaultList;
+
+        // Check if exists
+        const idx = list.findIndex(s => s.id === targetId);
+
+        if (idx !== -1) {
+            // Already exists, move to top
+            list.splice(idx, 1);
+        }
+
+        // Add to top
+        list.unshift(cleanedData);
+
+        // Limit size to avoid bloat (e.g., 200 songs)
+        if (list.length > 200) {
+            list.length = 200;
+        }
+
+        // Sync
+        await pushDataChange();
+
+        // Refresh sidebar to update count
+        renderMyLists(currentListData);
+    } catch (e) {
+        console.error('[DefaultList] 添加失败:', e);
     }
 }
 
@@ -1749,6 +1793,10 @@ function scrollToActiveLine(force = false) {
     // 计算目标参考线位置
     let offsetInContainer;
     const cover = document.getElementById('detail-cover');
+    const footer = document.getElementById('player-footer');
+    // 判断底部栏是否隐藏 (移动端隐藏时应该居中)
+    const isFooterHidden = footer && footer.classList.contains('translate-y-[110%]');
+
     // 桌面端且封面存在时，对齐到封面中心
     if (window.innerWidth >= 768 && cover) {
         const coverRect = cover.getBoundingClientRect();
@@ -1756,8 +1804,11 @@ function scrollToActiveLine(force = false) {
         // 计算封面中心相对于容器顶部的偏移量
         offsetInContainer = (coverRect.top + coverRect.height / 2) - containerRect.top;
     } else {
-        // 移动端或无封面时，保持 38% 黄金分割位
-        offsetInContainer = containerBox.clientHeight * 0.38;
+        // 移动端: 
+        // 1. 如果底部栏隐藏(全屏歌词)，使用 30% 
+        // 2. 否则使用 20%
+        const ratio = isFooterHidden ? 0.3 : 0.2;
+        offsetInContainer = containerBox.clientHeight * ratio;
     }
 
     const targetScroll = lineTop - offsetInContainer;
@@ -2442,16 +2493,20 @@ function handleCreateList() {
     const name = prompt("请输入新歌单名称:");
     if (name && currentListData) {
         const newList = {
-            id: 'list_' + Date.now(),
+            id: 'webplayer_' + Date.now(),
             name: name,
-            source: 'local',
+            source: 'webplayer',
             list: []
         };
         currentListData.userList.push(newList);
         // Sync
         pushDataChange().then(() => {
             renderMyLists(currentListData);
-            alert('歌单创建成功');
+            // Re-render the add modal grid if it is open (or just to keep it fresh)
+            if (typeof renderPlaylistAddGrid === 'function') {
+                renderPlaylistAddGrid();
+            }
+            // alert('歌单创建成功'); // Remove alert for smoother experience inside modal
         });
     }
 }
@@ -3081,34 +3136,20 @@ function closeCustomSourceModal() {
 // Playlist Add Modal (Collections)
 // ========================================
 
-// ========================================
-// Playlist Add Modal (Collections)
-// ========================================
 
-async function openPlaylistAddModal() {
-    if (!currentListData) {
-        showError('请先登录后使用收藏功能');
-        return;
-    }
-    // [Fix] Use currentPlayingSong instead of currentPlaylist[currentIndex]
-    // currentPlaylist might have changed if user searched for something else
+// Helper to render the grid (can be called from anywhere)
+function renderPlaylistAddGrid() {
     const song = currentPlayingSong;
-    if (!song) {
-        showError('当前没有正在播放的歌曲');
-        return;
-    }
+    if (!song) return;
 
-    const modal = document.getElementById('playlist-add-modal');
-    const content = document.getElementById('playlist-add-modal-content');
     const listContainer = document.getElementById('playlist-add-list');
-    const nameLabel = document.getElementById('playlist-add-song-name');
+    if (!listContainer) return;
 
-    if (!modal) return;
+    // Use standardized ID for checking inclusion
+    // Reuse cleanSongData logic to ensure we match what's saved
+    const cleanedSong = cleanSongData(song);
+    const targetId = cleanedSong.id;
 
-    // Set Info
-    nameLabel.innerText = song.name;
-
-    // Render List Items (Grid Buttons)
     listContainer.innerHTML = '';
 
     // Helper to create grid item
@@ -3136,16 +3177,42 @@ async function openPlaylistAddModal() {
 
     // 1. My Love
     const loveList = currentListData.loveList || [];
-    const isLoved = loveList.some(s => s.id === song.id);
+    const isLoved = loveList.some(s => s.id === targetId);
     listContainer.appendChild(createGridItem('love', '我的收藏', loveList.length, isLoved));
 
     // 2. User Lists
     if (currentListData.userList) {
         currentListData.userList.forEach(list => {
-            const isIncluded = list.list.some(s => s.id === song.id);
+            const isIncluded = list.list.some(s => s.id === targetId);
             listContainer.appendChild(createGridItem(list.id, list.name, list.list.length, isIncluded));
         });
     }
+}
+
+async function openPlaylistAddModal() {
+    if (!currentListData) {
+        showError('请先登录后使用收藏功能');
+        return;
+    }
+    // [Fix] Use currentPlayingSong instead of currentPlaylist[currentIndex]
+    // currentPlaylist might have changed if user searched for something else
+    const song = currentPlayingSong;
+    if (!song) {
+        showError('当前没有正在播放的歌曲');
+        return;
+    }
+
+    const modal = document.getElementById('playlist-add-modal');
+    const content = document.getElementById('playlist-add-modal-content');
+    const nameLabel = document.getElementById('playlist-add-song-name');
+
+    if (!modal) return;
+
+    // Set Info
+    nameLabel.innerText = song.name;
+
+    // Render List Items
+    renderPlaylistAddGrid();
 
     // Show Modal
     modal.classList.remove('hidden');
@@ -3206,8 +3273,8 @@ function cleanSongData(song) {
         songId: songId,
         albumName: albumName,
         picUrl: picUrl,
-        qualitys: sourceMeta.qualitys || song.qualitys,
-        _qualitys: sourceMeta._qualitys || song._qualitys,
+        qualitys: sourceMeta.qualitys || song.qualitys || song.types,
+        _qualitys: sourceMeta._qualitys || song._qualitys || song._types,
         albumId: sourceMeta.albumId || song.albumId
     };
 
@@ -3227,8 +3294,14 @@ function cleanSongData(song) {
     }
 
     // Common Base
+    // 确保 ID 格式为 source_songId (如 kw_123456)
+    // 如果 song.id 已经是 source_id 格式则保留，否则拼接
+    const fullId = (song.source && songId && !String(songId).startsWith(song.source + '_'))
+        ? `${song.source}_${songId}`
+        : (song.id || `${song.source || 'temp'}_${songId}`);
+
     const cleanSong = {
-        id: song.id, // Keep the main unique ID (often prefix_id)
+        id: fullId, // Standardized ID
         name: song.name,
         singer: song.singer,
         source: song.source,
@@ -3267,7 +3340,11 @@ async function handleTogglePlaylist(listId, btnElement) {
 
     if (!targetListArray) return;
 
-    const isCurrentlyIncluded = targetListArray.some(s => s.id === song.id);
+    const cleanedSong = cleanSongData(song); // 获取标准化的歌曲数据
+    const targetId = cleanedSong.id;
+
+    // Check against the standardized ID to ensure correct matching
+    const isCurrentlyIncluded = targetListArray.some(s => s.id === targetId);
     const willAdd = !isCurrentlyIncluded;
 
     // Optimistic UI Update
@@ -3275,9 +3352,9 @@ async function handleTogglePlaylist(listId, btnElement) {
 
     try {
         if (willAdd) {
-            targetListArray.unshift(cleanSongData(song));
+            targetListArray.unshift(cleanedSong);
         } else {
-            const idx = targetListArray.findIndex(s => s.id === song.id);
+            const idx = targetListArray.findIndex(s => s.id === targetId);
             if (idx >= 0) targetListArray.splice(idx, 1);
         }
 
@@ -3422,59 +3499,85 @@ if (audio) {
 // UI Helper Functions (Toast Notifications)
 // ========================================
 
-// 显示成功提示
-function showSuccess(message) {
+// 通用 Toast 显示函数 (支持宽屏、滚动文字、点击重置倒计时)
+function showToast(type, message, duration = 3000) {
+    const config = {
+        success: { bg: 'bg-emerald-500', icon: 'fa-check-circle' },
+        info: { bg: 'bg-blue-500', icon: 'fa-info-circle' },
+        error: { bg: 'bg-red-500', icon: 'fa-exclamation-circle' }
+    };
+    const conf = config[type] || config.info;
+
     const toast = document.createElement('div');
-    toast.className = 'fixed bottom-24 right-4 bg-emerald-500 text-white px-4 py-3 rounded-lg shadow-lg z-50 animate-slide-in';
+    // 加大宽度 (w-80 / w-96), 允许点击交互, 添加 cursor-pointer
+    toast.className = `fixed bottom-24 right-4 ${conf.bg} text-white px-4 py-3 rounded-lg shadow-lg z-50 animate-slide-in flex items-center gap-3 w-80 md:w-96 max-w-[90vw] cursor-pointer transition-all duration-300`;
+
+    // 判断文字长度，长文字启用滚动显示
+    // 假设中文占2字符宽，英文1字符。w-96大约容纳25-30个汉字。
+    // 这里简单按长度判断，超过 20 字则启用滚动
+    const isLongText = message.length > 20;
+
+    let contentHtml = '';
+    if (isLongText) {
+        // Marquee 结构: 使用 index.html 定义的 animate-marquee
+        // 注意: animate-marquee 是 translateX(-50%)，所以需要双重内容
+        contentHtml = `
+            <div class="flex-1 overflow-hidden relative h-6 group mask-image-linear-fade">
+                <div class="whitespace-nowrap absolute animate-marquee flex gap-8 items-center h-full">
+                    <span>${message}</span>
+                    <span>${message}</span>
+                </div>
+            </div>
+        `;
+    } else {
+        contentHtml = `<span class="flex-1 font-medium truncate">${message}</span>`;
+    }
+
     toast.innerHTML = `
-        <div class="flex items-center gap-2">
-            <i class="fas fa-check-circle"></i>
-            <span>${message}</span>
-        </div>
+        <i class="fas ${conf.icon} text-xl shrink-0"></i>
+        ${contentHtml}
     `;
+
     document.body.appendChild(toast);
 
-    setTimeout(() => {
-        toast.classList.add('opacity-0', 'transition-opacity');
-        setTimeout(() => toast.remove(), 300);
-    }, 2000);
+    // 倒计时逻辑
+    let hideTimer = null;
+
+    const startTimer = () => {
+        if (hideTimer) clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => {
+            toast.classList.add('opacity-0', 'translate-y-4'); // 向下滑出
+            setTimeout(() => toast.remove(), 300);
+        }, duration);
+    };
+
+    startTimer();
+
+    // 点击事件: 重新计时 (用户请求: 点击了那个信息就重新计时隐藏)
+    toast.addEventListener('click', () => {
+        // 视觉反馈
+        toast.classList.add('scale-[1.02]', 'brightness-110');
+        setTimeout(() => toast.classList.remove('scale-[1.02]', 'brightness-110'), 150);
+
+        // 重置计时器
+        startTimer();
+        console.log('[Toast] Timer reset by click');
+    });
+
+    // 鼠标悬停暂停计时 (优化体验)
+    toast.addEventListener('mouseenter', () => {
+        if (hideTimer) clearTimeout(hideTimer);
+    });
+
+    toast.addEventListener('mouseleave', () => {
+        startTimer();
+    });
 }
 
-// 显示信息提示
-function showInfo(message) {
-    const toast = document.createElement('div');
-    toast.className = 'fixed bottom-24 right-4 bg-blue-500 text-white px-4 py-3 rounded-lg shadow-lg z-50 animate-slide-in';
-    toast.innerHTML = `
-        <div class="flex items-center gap-2">
-            <i class="fas fa-info-circle"></i>
-            <span>${message}</span>
-        </div>
-    `;
-    document.body.appendChild(toast);
-
-    setTimeout(() => {
-        toast.classList.add('opacity-0', 'transition-opacity');
-        setTimeout(() => toast.remove(), 300);
-    }, 2000);
-}
-
-// 显示错误提示
-function showError(message) {
-    const toast = document.createElement('div');
-    toast.className = 'fixed bottom-24 right-4 bg-red-500 text-white px-4 py-3 rounded-lg shadow-lg z-50 animate-slide-in';
-    toast.innerHTML = `
-        <div class="flex items-center gap-2">
-            <i class="fas fa-exclamation-circle"></i>
-            <span>${message}</span>
-        </div>
-    `;
-    document.body.appendChild(toast);
-
-    setTimeout(() => {
-        toast.classList.add('opacity-0', 'transition-opacity');
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
-}
+// 封装旧 API
+function showSuccess(message) { showToast('success', message, 2000); }
+function showInfo(message) { showToast('info', message, 3000); }
+function showError(message) { showToast('error', message, 4000); }
 
 // 监听窗口大小变化
 window.addEventListener('resize', () => {
@@ -3669,3 +3772,79 @@ function toggleDetailCover() {
         container.classList.remove('pt-8');
     }
 }
+
+// 切换底部播放栏显示/隐藏 (移动端)
+function togglePlayerPanel() {
+    const footer = document.getElementById('player-footer');
+    const expandBtn = document.getElementById('btn-expand-panel');
+
+    if (!footer || !expandBtn) return;
+
+    // 检查是否已经隐藏 (通过 transform 判断)
+    // 注意: Tailwind 的 translate-y-full 等同于 transform: translateY(100%)
+    const isHidden = footer.classList.contains('translate-y-[110%]');
+
+    const views = ['view-search', 'view-settings', 'view-favorites'];
+    const playerDetail = document.getElementById('view-player-detail');
+    const lyricsWrapper = document.getElementById('lyrics-wrapper');
+
+    if (isHidden) {
+        // 显示播放栏
+        footer.classList.remove('translate-y-[110%]');
+
+        // 隐藏展开按钮
+        expandBtn.classList.remove('translate-y-0', 'opacity-100');
+        expandBtn.classList.add('translate-y-20', 'opacity-0');
+
+        // 恢复内容底部 Padding
+        views.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.add('pb-32');
+        });
+
+        // 歌词页: 增加底部 Padding (避开播放栏)
+        if (playerDetail) {
+            playerDetail.classList.add('pb-24');
+            playerDetail.classList.remove('pb-0');
+        }
+
+        // 歌词高度限制: 恢复限制
+        if (lyricsWrapper) {
+            lyricsWrapper.classList.add('max-h-[60vh]');
+            lyricsWrapper.classList.remove('h-full');
+        }
+    } else {
+        // 隐藏播放栏 (向下移出屏幕) 
+        footer.classList.add('translate-y-[110%]');
+
+        // 显示展开按钮
+        expandBtn.classList.remove('translate-y-20', 'opacity-0');
+        expandBtn.classList.add('translate-y-0', 'opacity-100');
+
+        // 移除内容底部 Padding (内容延伸到底部)
+        views.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.remove('pb-32');
+        });
+
+        // 歌词页: 移除底部 Padding (利用底部空间)
+        if (playerDetail) {
+            playerDetail.classList.remove('pb-24');
+            playerDetail.classList.add('pb-0');
+        }
+
+        // 歌词高度限制: 该满屏
+        if (lyricsWrapper) {
+            lyricsWrapper.classList.remove('max-h-[60vh]');
+            lyricsWrapper.classList.add('h-full');
+        }
+    }
+
+    // 重新校准歌词位置 (动画结束后执行)
+    setTimeout(() => {
+        scrollToActiveLine(true);
+    }, 300);
+}
+
+// 导出函数
+window.togglePlayerPanel = togglePlayerPanel;

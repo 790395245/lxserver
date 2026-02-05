@@ -1,0 +1,84 @@
+{
+    "defaultList": [],
+    "loveList": [],
+    "userList": [
+        {
+            "id": "list_1770271914478",
+            "name": "test",
+            "source": "local",
+            "list": [
+                {
+                    "id": "1115637302",
+                    "name": "芒种",
+                    "singer": "音阙诗听、赵方婧",
+                    "source": "mg",
+                    "interval": "03:36",
+                    "meta": {
+                        "songId": "1115637302",
+                        "albumName": "二十四节气",
+                        "picUrl": "http://d.musicapp.migu.cn/data/oss/resource/00/5i/gr/d15ec798b3094bb3901d393f9b3e4e9f.webp",
+                        "albumId": "1139709323",
+                        "copyrightId": "69069804504",
+                        "lrcUrl": "https://d.musicapp.migu.cn/data/oss/resource/00/5b/u1/bfaa5949545046fdaac443ac711f0169"
+                    }
+                },
+                {
+                    "id": "70136644",
+                    "name": "芒种",
+                    "singer": "音阙诗听、赵方婧",
+                    "source": "kw",
+                    "interval": "03:36",
+                    "meta": {
+                        "songId": "70136644",
+                        "albumName": "二十四节气",
+                        "picUrl": "https://img4.kuwo.cn/star/albumcover/500120/3/90/294601908.jpg",
+                        "albumId": "13314026"
+                    }
+                },
+                {
+                    "id": 55521341,
+                    "name": "芒种",
+                    "singer": "音阙诗听、赵方婧",
+                    "source": "kg",
+                    "interval": "03:36",
+                    "meta": {
+                        "songId": 55521341,
+                        "albumName": "二十四节气",
+                        "picUrl": "http://imge.kugou.com/stdmusic/240/20200403/20200403112615663119.jpg",
+                        "albumId": "36895840",
+                        "hash": "3136CC973F70DCFF711F82BF43AC094A"
+                    }
+                },
+                {
+                    "id": "0020VnHM0U9uNh",
+                    "name": "芒种",
+                    "singer": "音阙诗听、赵方婧",
+                    "source": "tx",
+                    "interval": "03:36",
+                    "meta": {
+                        "songId": 233060208,
+                        "albumName": "二十四节气",
+                        "picUrl": "https://y.gtimg.cn/music/photo_new/T002R500x500M0000035FWvO0bwXTo.jpg",
+                        "albumId": "0035FWvO0bwXTo",
+                        "strMediaMid": "0020VnHM0U9uNh",
+                        "id": 233060208,
+                        "albumMid": "0035FWvO0bwXTo"
+                    }
+                },
+                {
+                    "id": 1369798757,
+                    "name": "芒种",
+                    "singer": "音阙诗听、赵方婧",
+                    "source": "wy",
+                    "interval": "03:36",
+                    "meta": {
+                        "songId": 1369798757,
+                        "albumName": "二十四节气",
+                        "picUrl": "http://p2.music.126.net/KFWbxh1ZLyy9WR77Ca08tA==/109951164866828786.jpg",
+                        "albumId": 87547851
+                    }
+                }
+            ]
+        }
+    ]
+}

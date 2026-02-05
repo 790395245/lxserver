@@ -16,9 +16,15 @@ const getAvailableIP = (req: http.IncomingMessage) => {
   return ip && (store.get<number>(ip) ?? 0) < 10 ? ip : null
 }
 
-const verifyByKey = (encryptMsg: string, userId: string) => {
+const verifyByKey = (encryptMsg: string, userId: string, targetUserName?: string) => {
   const userName = getUserName(userId)
   if (!userName) return null
+
+  // 如果指定了目标用户名（通过URL路径），则必须匹配
+  if (global.lx.config['user.enablePath'] && targetUserName && userName !== targetUserName) {
+    return null
+  }
+
   const userSpace = getUserSpace(userName)
   const keyInfo = userSpace.dataManage.getClientKeyInfo(userId)
   if (!keyInfo) return null
@@ -80,7 +86,7 @@ export const authCode = async (req: http.IncomingMessage, res: http.ServerRespon
     if (typeof req.headers.m == 'string' && req.headers.m) {
       const userId = req.headers.i
       const _msg = typeof userId == 'string' && userId
-        ? verifyByKey(req.headers.m, userId)
+        ? verifyByKey(req.headers.m, userId, targetUserName)
         : verifyByCode(req.headers.m, users, targetUserName)
       if (_msg != null) {
         msg = _msg
@@ -125,7 +131,25 @@ export const authConnect = async (req: http.IncomingMessage) => {
     const query = querystring.parse((req.url as string).split('?')[1])
     const i = query.i
     const t = query.t
-    if (typeof i == 'string' && typeof t == 'string' && verifyConnection(t, i)) return
+    if (typeof i == 'string' && typeof t == 'string' && verifyConnection(t, i)) {
+      // 验证 URL 路径中的用户名是否与连接的客户端所属用户一致
+      if (global.lx.config['user.enablePath']) {
+        const path = (req.url as string).split('?')[0]
+        const pathParts = path.split('/').filter(p => p)
+        // 假设路径格式为 /<username>
+        // 解码 URL 编码的用户名
+        const urlUserName = pathParts[0] ? decodeURIComponent(pathParts[0]) : null
+        const clientUserName = getUserName(i)
+
+        // console.log('Auth check path:', urlUserName, clientUserName)
+
+        if (urlUserName && clientUserName && urlUserName !== clientUserName) {
+          // 如果路径中有用户名，且与客户端所属用户不一致，则拒绝连接
+          throw new Error('User mismatch')
+        }
+      }
+      return
+    }
 
     const num = store.get<number>(ip) ?? 0
     store.set(ip, num + 1)
