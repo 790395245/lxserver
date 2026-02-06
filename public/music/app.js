@@ -30,7 +30,8 @@ let settings = {
     enablePublicSources: true, // 是否显示公开源
     enableProxyPlayback: false, // 播放音乐代理
     enableProxyDownload: false, // 下载音乐代理
-    hotSearchLimit: 20 // 热搜显示数量
+    hotSearchLimit: 20, // 热搜显示数量
+    lyricFontSize: 1.25 // 歌词字体大小 (rem)
 };
 
 // 从 localStorage 加载设置
@@ -195,6 +196,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if (hotSearchLimitInput) {
         hotSearchLimitInput.value = (settings.hotSearchLimit !== undefined && settings.hotSearchLimit !== null) ? settings.hotSearchLimit : 20;
     }
+
+    // Initialize Lyric Font Size UI
+    const lyricFontSizeSlider = document.getElementById('lyric-font-size-slider');
+    const lyricFontSizeValue = document.getElementById('lyric-font-size-value');
+    if (lyricFontSizeSlider && lyricFontSizeValue) {
+        const size = settings.lyricFontSize || 1.25;
+        lyricFontSizeSlider.value = size;
+        lyricFontSizeValue.innerText = size;
+        document.documentElement.style.setProperty('--lyric-font-size', `${size}rem`);
+    }
 });
 
 // 切换代理设置
@@ -228,6 +239,23 @@ function changeHotSearchLimit(value) {
         // Reset input
         const input = document.getElementById('hot-search-limit-input');
         if (input) input.value = settings.hotSearchLimit || 20;
+    }
+}
+
+function changeLyricFontSize(value) {
+    const size = parseFloat(value);
+    if (!isNaN(size)) {
+        settings.lyricFontSize = size;
+        localStorage.setItem('lx_settings', JSON.stringify(settings));
+
+        // Apply style
+        document.documentElement.style.setProperty('--lyric-font-size', `${size}rem`);
+
+        // Update UI value display
+        const valueEl = document.getElementById('lyric-font-size-value');
+        if (valueEl) valueEl.innerText = size;
+
+        console.log(`[Settings] Lyric Font Size: ${size}rem`);
     }
 }
 
@@ -924,7 +952,7 @@ function lazyLoadImages() {
 // Playback Logic
 let currentLoadingSongId = null; // Track currently loading song
 
-let currentQuality = '128k'; // 当前播放音质
+let currentQuality = null; // 当前播放音质 (从 settings.preferredQuality 动态获取)
 let hintTimeout = null;
 
 async function playSong(song, index, forceQuality = null) {
@@ -942,6 +970,18 @@ async function playSong(song, index, forceQuality = null) {
     currentPlayingSong = song;
     updatePlayerInfo(song);
     updateMediaSessionMetadata(song);
+
+    // [Fix] 切换歌曲前强制重置手动滚动状态
+    isUserScrolling = false;
+    if (scrollLockTimeout) {
+        clearTimeout(scrollLockTimeout);
+        scrollLockTimeout = null;
+    }
+    const indicator = document.getElementById('lyric-scroll-indicator');
+    if (indicator) {
+        indicator.classList.add('hidden');
+        indicator.style.display = 'none';
+    }
 
     // Show persistent loading toast
     showInfo(`正在加载: ${song.name}...`);
@@ -1030,8 +1070,10 @@ async function playSong(song, index, forceQuality = null) {
 
                 // 保存播放历史
                 savePlayHistory(song, currentQuality);
-                // 添加到默认列表 (播放历史/试听列表)
-                addToDefaultList(song);
+                // 只有在搜索列表中播放时才添加到默认列表 (试听列表)
+                if (currentSearchScope === 'network') {
+                    addToDefaultList(song);
+                }
 
                 console.log(`[Player] 播放成功: ${result.url.substring(0, 50)}...`);
             } catch (playError) {
@@ -1706,6 +1748,7 @@ window.changeProxyPlayback = changeProxyPlayback;
 window.changeProxyDownload = changeProxyDownload;
 window.playPrev = playPrev;
 window.seek = seek;
+window.changeLyricFontSize = changeLyricFontSize;
 // 音量控制
 window.setVolume = setVolume;
 window.toggleMute = toggleMute;
@@ -1739,7 +1782,11 @@ function toggleLyrics() {
             if (currentLyricLines.length === 0) {
                 fetchLyric(currentPlayingSong);
             }
-            // LinePlayer handles syncing automatically
+            // [Fix] Ensure we are synced and centered when opening
+            if (lyricPlayer) {
+                lyricPlayer.play(audio.currentTime * 1000);
+            }
+            setTimeout(() => scrollToActiveLine(true), 100);
         }
     } else {
         view.classList.add('translate-y-[100%]', 'opacity-0');
@@ -1919,11 +1966,11 @@ function scrollToActiveLine(force = false) {
         behavior: 'smooth'
     });
 
-    // 1000ms 后清除标记 (给予平滑滚动足够的时间)
+    // 1500ms 后清除标记 (给予平滑滚动足够的时间)
     window.programmaticScrollTimer = setTimeout(() => {
         isProgrammaticScroll = false;
         window.programmaticScrollTimer = null;
-    }, 800);
+    }, 1500);
 }
 
 // Sync lyric by line number (called by LinePlayer)
@@ -2187,10 +2234,16 @@ function renderLyric(lines, emptyMsg = '暂无歌词') {
 
     // [Fix] Ensure we are in auto-scroll mode and centered on load
     isUserScrolling = false;
+
+    // If audio is already playing, sync the player immediately to highlight the right line
+    if (lyricPlayer && !audio.paused) {
+        lyricPlayer.play(audio.currentTime * 1000);
+    }
+
     // Force a scroll update after a short delay to ensure layout is ready
     setTimeout(() => {
         scrollToActiveLine(true);
-    }, 50);
+    }, 100);
 }
 
 
@@ -3716,6 +3769,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         lyricContainer.addEventListener('mousedown', setUserInteracting, { passive: true });
         lyricContainer.addEventListener('touchstart', setUserInteracting, { passive: true });
+        lyricContainer.addEventListener('touchmove', setUserInteracting, { passive: true });
         lyricContainer.addEventListener('wheel', setUserInteracting, { passive: true });
         lyricContainer.addEventListener('keydown', setUserInteracting, { passive: true }); // Keyboard arrow keys
 
@@ -3847,6 +3901,8 @@ function toggleDetailCover() {
     const lyricContent = document.getElementById('lyric-content');
     const titleContainer = document.querySelector('#lyrics-wrapper > div:first-child'); // Title/Artist container
 
+    const titleParent = document.getElementById('lyrics-wrapper').querySelector('div:first-child');
+
     if (!cover || !container) return;
 
     // Toggle state based on class presence
@@ -3854,47 +3910,41 @@ function toggleDetailCover() {
 
     if (!isHidden) {
         // HIDE COVER
-        // Collapse dimensions
+        // ... (existing cover hiding logic)
         cover.style.maxHeight = '0px';
-        cover.style.maxWidth = '0px'; // For desktop collapse
+        cover.style.maxWidth = '0px';
         cover.style.margin = '0px';
-
         cover.classList.remove('mb-8', 'md:mb-0');
-        // Fade out and shrink
         cover.classList.add('opacity-0', 'scale-90', 'border-0');
 
-        // Move container UP by reducing top padding
         container.classList.remove('pt-24');
-        container.classList.add('pt-8'); // Less padding on top
+        container.classList.add('pt-8', 'md:pt-32');
 
-        // Center Lyrics on Desktop
         if (lyricsWrapper) {
             lyricsWrapper.classList.remove('md:w-1/2');
-            lyricsWrapper.classList.add('md:w-2/3', 'mx-auto', 'lyrics-centered'); // Centered and slightly wider
+            lyricsWrapper.classList.add('md:w-2/3', 'mx-auto', 'lyrics-centered');
         }
 
         if (lyricContent) {
-            // Revert to mobile defaults (center)
             lyricContent.classList.remove('md:items-start', 'md:text-left');
+            lyricContent.classList.add('items-center', 'text-center');
         }
 
-        if (titleContainer) {
-            titleContainer.classList.remove('md:text-left');
+        if (titleParent) {
+            titleParent.classList.remove('md:text-left');
+            titleParent.classList.add('text-center');
         }
 
     } else {
         // SHOW COVER
         cover.style.maxHeight = '';
-        cover.style.maxWidth = ''; // Restore
+        cover.style.maxWidth = '';
         cover.style.margin = '';
-
         cover.classList.remove('opacity-0', 'scale-90', 'border-0');
 
-        // Restore padding
         container.classList.add('pt-24');
-        container.classList.remove('pt-8');
+        container.classList.remove('pt-8', 'md:pt-32');
 
-        // Restore Layout
         if (lyricsWrapper) {
             lyricsWrapper.classList.add('md:w-1/2');
             lyricsWrapper.classList.remove('md:w-2/3', 'mx-auto', 'lyrics-centered');
@@ -3902,10 +3952,12 @@ function toggleDetailCover() {
 
         if (lyricContent) {
             lyricContent.classList.add('md:items-start', 'md:text-left');
+            lyricContent.classList.remove('items-center', 'text-center');
         }
 
-        if (titleContainer) {
-            titleContainer.classList.add('md:text-left');
+        if (titleParent) {
+            titleParent.classList.add('md:text-left');
+            titleParent.classList.remove('text-center');
         }
     }
 }
@@ -3921,7 +3973,7 @@ function togglePlayerPanel() {
     // 注意: Tailwind 的 translate-y-full 等同于 transform: translateY(100%)
     const isHidden = footer.classList.contains('translate-y-[110%]');
 
-    const views = ['view-search', 'view-settings', 'view-favorites'];
+    const views = ['view-search', 'view-settings', 'view-favorites', 'view-about', 'main-sidebar'];
     const playerDetail = document.getElementById('view-player-detail');
     const lyricsWrapper = document.getElementById('lyrics-wrapper');
 

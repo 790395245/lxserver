@@ -161,6 +161,19 @@
             opacity: 1 !important;
             visibility: visible !important;
         }
+
+        /* Lyric Font Size Variable */
+        :root {
+            --lyric-font-size: 1.25rem;
+        }
+
+        .lyric-line .font-lrc {
+            font-size: var(--lyric-font-size) !important;
+        }
+
+        .lyric-line .extended {
+            font-size: calc(var(--lyric-font-size) * 0.7) !important;
+        }
     </style>
 </head>
 
@@ -230,7 +243,7 @@
 
         <!-- Sidebar -->
         <aside id="main-sidebar"
-            class="w-64 bg-white shadow-lg flex flex-col z-[60] fixed inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 md:z-30 h-full">
+            class="w-64 bg-white shadow-lg flex flex-col z-[60] fixed inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 md:z-30 h-full pb-32 transition-all duration-300">
             <div class="h-16 flex items-center justify-center border-b border-gray-100 relative">
                 <svg viewBox="0 0 447.942 447.943" class="w-8 h-8 mr-2 rounded-lg shadow-sm"
                     xmlns="http://www.w3.org/2000/svg">
@@ -349,7 +362,7 @@
 
                 <!-- Search View -->
                 <div id="view-search"
-                    class="absolute inset-0 flex flex-col p-2 pb-32 md:p-6 md:pb-6 overflow-hidden transition-all duration-300">
+                    class="absolute inset-0 flex flex-col px-2 pt-2 md:px-6 md:pt-6 pb-32 overflow-hidden transition-all duration-300">
                     <!-- Search Input Area -->
                     <div class="flex flex-col md:flex-row gap-2 md:gap-4 mb-4 md:mb-6">
                         <!-- Search Input -->
@@ -458,7 +471,7 @@
 
             <!-- Favorites View -->
             <div id="view-favorites"
-                class="absolute inset-0 flex flex-col p-6 pb-32 md:pb-6 hidden opacity-0 transition-all duration-300">
+                class="absolute inset-0 flex flex-col px-6 pt-6 pb-32 hidden opacity-0 transition-all duration-300">
                 <div class="flex-1 flex flex-col items-center justify-center text-gray-400">
                     <i class="fas fa-heart-broken text-6xl opacity-20 mb-4"></i>
                     <h2 class="text-xl font-medium text-gray-500">敬请期待</h2>
@@ -468,7 +481,7 @@
 
             <!-- Settings View -->
             <div id="view-settings"
-                class="absolute inset-0 overflow-y-auto custom-scrollbar p-6 pb-32 md:pb-6 hidden opacity-0 transition-all duration-300">
+                class="absolute inset-0 overflow-y-auto custom-scrollbar px-6 pt-6 pb-32 hidden opacity-0 transition-all duration-300">
                 <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 max-w-2xl mx-auto w-full">
                     <h2 class="text-2xl font-bold text-gray-800 mb-6">设置</h2>
 
@@ -743,6 +756,26 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Lyric Font Size -->
+                        <div class="bg-white rounded-xl border border-gray-100 p-4 hover:shadow-sm transition-shadow">
+                            <h3 class="font-bold text-gray-800 text-sm mb-3 flex items-center">
+                                <i class="fas fa-font mr-2 text-emerald-500"></i> 歌词字体大小 (Lyric Font Size)
+                            </h3>
+                            <div class="flex items-center justify-between">
+                                <div class="text-xs text-gray-500 mr-4">
+                                    设置播放详情页歌词显示的大小 (单位: rem)
+                                </div>
+                                <div class="flex items-center gap-3 w-40">
+                                    <input type="range" id="lyric-font-size-slider"
+                                        class="flex-1 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                                        min="0.8" max="3.0" step="0.1" value="1.2"
+                                        oninput="changeLyricFontSize(this.value)">
+                                    <span id="lyric-font-size-value"
+                                        class="text-sm font-mono text-emerald-600 w-8">1.2</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -750,7 +783,7 @@
 
     <!-- About View -->
     <div id="view-about"
-        class="absolute inset-0 overflow-y-auto custom-scrollbar p-6 hidden opacity-0 transition-opacity duration-300">
+        class="absolute inset-0 overflow-y-auto custom-scrollbar px-6 pt-6 pb-32 hidden opacity-0 transition-opacity duration-300">
         <div
             class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 max-w-3xl mx-auto w-full prose prose-emerald">
             <div id="about-content" class="animate-pulse">
@@ -836,7 +869,7 @@
                 <!-- Scrollable Lyrics Area -->
                 <div id="lyric-container"
                     class="flex-1 w-full overflow-y-auto relative no-scrollbar mask-image-gradient"
-                    style="scroll-behavior: smooth;" onwheel="handleLyricScroll()">
+                    onwheel="handleLyricScroll()">
 
                     <div id="lyric-content"
                         class="flex flex-col items-center md:items-start text-center md:text-left gap-3 md:gap-6 py-[40vh] transition-transform duration-300 ease-out">
@@ -850,10 +883,10 @@
 
     <!-- Player Bar -->
     <footer id="player-footer"
-        class="fixed bottom-0 left-0 w-full md:relative h-auto md:h-24 py-2 md:py-0 bg-white/90 backdrop-blur-lg border-t border-gray-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] flex flex-col md:flex-row items-center px-4 md:px-6 z-50 transition-all duration-300">
+        class="fixed bottom-0 left-0 w-full h-auto md:h-24 py-2 md:py-0 bg-white/90 backdrop-blur-lg border-t border-gray-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] flex flex-col md:flex-row items-center px-4 md:px-6 z-50 transition-all duration-300">
 
         <!-- Song Info -->
-        <div class="w-full md:w-1/4 flex items-center gap-3 md:gap-4 mb-2 md:mb-0">
+        <div class="w-full md:w-1/4 flex items-center gap-3 md:gap-4 mb-2 md:mb-0 pr-10 md:pr-0">
             <div
                 class="w-12 h-12 md:w-14 md:h-14 bg-gray-200 rounded-md overflow-hidden shadow-sm relative group flex-shrink-0">
                 <img id="player-cover" src="/music/assets/logo.svg" onerror="this.src='/music/assets/logo.svg'"
@@ -874,10 +907,7 @@
             <!-- Like button -->
             <button id="player-like-btn" class="text-gray-300 hover:text-red-500 transition-colors ml-2"><i
                     class="fas fa-heart"></i></button>
-            <!-- Mobile Toggle Lyrics -->
-            <button class="md:hidden text-gray-500 px-2" onclick="toggleLyrics()">
-                <i class="fas fa-chevron-up"></i>
-            </button>
+
         </div>
 
         <!-- Controls & Progress -->
@@ -945,18 +975,11 @@
                 </button>
                 <button class="text-gray-600 hover:text-emerald-600 text-lg transition-colors p-2"
                     onclick="playNext()"><i class="fas fa-step-forward"></i></button>
-
-                <!-- Collapse Panel Button (Mobile Only) -->
-                <button id="btn-collapse-panel"
-                    class="md:hidden absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 p-2 hover:text-gray-600"
-                    onclick="togglePlayerPanel()">
-                    <i class="fas fa-chevron-down text-lg"></i>
-                </button>
             </div>
         </div>
 
         <!-- Volume & Lyrics (Hidden on small mobile if needed, or simplified) -->
-        <div class="w-full md:w-1/4 hidden md:flex items-center justify-end gap-4 order-2 md:order-none">
+        <div class="w-full md:w-1/4 hidden md:flex items-center justify-end gap-4 order-2 md:order-none mr-8">
             <button
                 class="text-gray-500 hover:text-emerald-600 text-sm font-bold border border-gray-300 rounded px-2 py-0.5"
                 onclick="toggleLyrics()">词</button>
@@ -974,12 +997,18 @@
                 </div>
             </div>
         </div>
+
+        <!-- Collapse Panel Button -->
+        <button id="btn-collapse-panel"
+            class="absolute right-2 md:right-6 top-2 md:top-1/2 md:-translate-y-1/2 text-gray-400 p-2 hover:text-gray-600 transition-all z-10"
+            onclick="togglePlayerPanel()">
+            <i class="fas fa-chevron-down text-lg"></i>
+        </button>
     </footer>
 
     <!-- Expand Panel Button (Hidden by default, shown when panel is collapsed) -->
-    <!-- Expand Panel Button (Hidden by default, shown when panel is collapsed) -->
     <button id="btn-expand-panel" onclick="togglePlayerPanel()"
-        class="md:hidden fixed bottom-20 right-6 z-40 w-12 h-12 flex items-center justify-center bg-white/80 backdrop-blur-md rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.12)] text-gray-500 hover:text-emerald-500 transform transition-all duration-300 translate-y-20 opacity-0 border border-white/50">
+        class="fixed bottom-24 right-6 z-40 w-12 h-12 flex items-center justify-center bg-white/80 backdrop-blur-md rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.12)] text-gray-500 hover:text-emerald-500 transform transition-all duration-300 translate-y-20 opacity-0 border border-white/50">
         <i class="fas fa-chevron-up text-lg"></i>
     </button>
 
