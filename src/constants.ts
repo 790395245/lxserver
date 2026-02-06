@@ -16,6 +16,7 @@ export const ENV_PARAMS = [
   'USER_ENABLE_ROOT',
   'ENABLE_WEBPLAYER_AUTH',
   'WEBPLAYER_PASSWORD',
+  'DISABLE_TELEMETRY',
   'LX_USER_',
 ] as const
 

@@ -76,5 +76,10 @@ module.exports = {
 
   // Web播放器 访问密码
   // 环境变量: WEBPLAYER_PASSWORD
-  "player.password": "123456"
+  "player.password": "123456",
+
+  // 是否禁用数据收集
+  // 环境变量: DISABLE_TELEMETRY (true/false)
+  // 说明：仅收集版本号、运行环境（Docker/Node）、OS类型等非敏感信息用于项目改进。绝对匿名，不收集IP。
+  "disableTelemetry": false
 }

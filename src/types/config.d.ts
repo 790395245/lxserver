@@ -116,6 +116,11 @@ declare namespace LX {
      * Web播放器访问密码
      */
     'player.password'?: string
+
+    /**
+     * 是否禁用数据收集
+     */
+    disableTelemetry?: boolean
   }
 }
 

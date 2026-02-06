@@ -1,4 +1,18 @@
-
+/*
+ * Copyright 2026 xcq0607 (https://github.com/xcq0607)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 const API_BASE = '/api/music';
 let currentPage = 1;
@@ -12,11 +26,11 @@ const audio = document.getElementById('audio-player');
 // Settings & Batch Selection
 let settings = {
     itemsPerPage: 20, // Default 20 items per page, can be 'all'
-    itemsPerPage: 20, // Default 20 items per page, can be 'all'
     preferredQuality: '320k', // 默认音质偏好
     enablePublicSources: true, // 是否显示公开源
     enableProxyPlayback: false, // 播放音乐代理
-    enableProxyDownload: false // 下载音乐代理
+    enableProxyDownload: false, // 下载音乐代理
+    hotSearchLimit: 20 // 热搜显示数量
 };
 
 // 从 localStorage 加载设置
@@ -176,6 +190,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const proxyDownload = document.getElementById('toggle-proxy-download');
     if (proxyDownload) proxyDownload.checked = settings.enableProxyDownload;
+
+    const hotSearchLimitInput = document.getElementById('hot-search-limit-input');
+    if (hotSearchLimitInput) {
+        hotSearchLimitInput.value = (settings.hotSearchLimit !== undefined && settings.hotSearchLimit !== null) ? settings.hotSearchLimit : 20;
+    }
 });
 
 // 切换代理设置
@@ -189,6 +208,27 @@ function changeProxyDownload(enabled) {
     settings.enableProxyDownload = enabled;
     localStorage.setItem('lx_settings', JSON.stringify(settings));
     console.log(`[Settings] Proxy Download: ${enabled}`);
+}
+
+function changeHotSearchLimit(value) {
+    const limit = parseInt(value);
+    // [Fix] Allow 0, Check Range 0-50
+    if (!isNaN(limit) && limit >= 0 && limit <= 50) {
+        settings.hotSearchLimit = limit;
+        localStorage.setItem('lx_settings', JSON.stringify(settings));
+        console.log(`[Settings] Hot Search Limit: ${limit}`);
+
+        // If currently on search tab and showing hot search, refresh
+        // Check if search-results-header is hidden (means we are in hot search mode or initial state)
+        if (document.getElementById('search-results-header')?.classList.contains('hidden')) {
+            showInitialSearchState(); // Refreshes the view
+        }
+    } else {
+        showError('请输入 0 到 50 之间的数字');
+        // Reset input
+        const input = document.getElementById('hot-search-limit-input');
+        if (input) input.value = settings.hotSearchLimit || 20;
+    }
 }
 
 // 切换音质偏好
@@ -473,7 +513,8 @@ function renderHotSearch(data) {
         header.classList.add('hidden');
     }
 
-    if (!container || !data || !data.list || data.list.length === 0) {
+    // [Fix] If limit is 0, treat as disabled and show default state
+    if (!container || !data || !data.list || data.list.length === 0 || settings.hotSearchLimit === 0) {
         // 显示默认空白状态
         container.innerHTML = `
             <div class="flex flex-col items-center justify-center h-full text-gray-400 space-y-4">
@@ -485,7 +526,9 @@ function renderHotSearch(data) {
     }
 
     const sourceTag = getSourceTag(data.source);
-    const keywords = data.list.slice(0, 20); // 最多显示20个热搜词
+    // [Fix] Correctly handle 0, do not fall back to 20 if 0 is set
+    const limit = (settings.hotSearchLimit !== undefined && settings.hotSearchLimit !== null) ? settings.hotSearchLimit : 20;
+    const keywords = data.list.slice(0, limit); // 使用设置的数量
 
     container.innerHTML = `
         <div class="hot-search-container p-8">
@@ -716,7 +759,7 @@ function renderResults(list) {
             <div class="col-span-8 sm:col-span-7 md:col-span-6 lg:col-span-4 flex items-center overflow-hidden pr-2">
                 <div class="relative w-10 h-10 md:w-12 md:h-12 mr-3 md:mr-4 flex-shrink-0 group cursor-pointer">
                      <img data-src="${imgUrl}" src="/music/assets/logo.svg" 
-                          class="lazy-image w-full h-full rounded-lg object-cover shadow-sm group-hover:shadow-md transition-all group-hover:scale-105 duration-300" 
+                          class="lazy-image w-full h-full rounded-lg object-cover shadow-sm group-hover:shadow-md transition-all group-hover:scale-105 duration-300 dynamic-logo" 
                           alt="${item.name}"
                           onerror="this.src='/music/assets/logo.svg'"
                           onclick="playSong(${JSON.stringify(item).replace(/"/g, '&quot;')}, ${actualIndex})">
@@ -785,23 +828,49 @@ function renderResults(list) {
 
     // Init Lazy Loader
     lazyLoadImages();
+    applyMarqueeChecks();
 }
 
 // Generic Marquee Helper
 function createMarqueeHtml(text, className = '') {
-    // Simple heuristic: if text length > 8 (approx), make it scroll
-    // Ideally we check scrollWidth, but for list generation string length is a cheap proxy
-    if (text.length > 8) {
-        const gap = '<span class="mx-6"></span>';
-        return `
-        <div class="overflow-hidden whitespace-nowrap w-full ${className}">
-            <div class="inline-block animate-marquee hover:pause-animation">
-                <span>${text}</span>${gap}<span>${text}</span>${gap}
-            </div>
-        </div>`;
-    }
-    return `<div class="truncate ${className}">${text}</div>`;
+    // Return a container marked for dynamic checking
+    // different screens are different, so we check overflow after render
+    // Added min-w-0 to prevent flex item from expanding beyond parent
+    return `<div class="truncate dynamic-marquee min-w-0 ${className}" data-text="${text.replace(/"/g, '&quot;')}">${text}</div>`;
 }
+
+function applyMarqueeChecks() {
+    // Wait for render
+    setTimeout(() => {
+        const elements = document.querySelectorAll('.dynamic-marquee.truncate');
+        elements.forEach(el => {
+            if (el.scrollWidth > el.clientWidth) {
+                const text = el.getAttribute('data-text') || el.innerText;
+                const gap = '<span class="mx-8"></span>'; // 增加间距
+
+                // 必须保留 overflow-hidden 以限制宽度
+                el.classList.remove('truncate');
+                el.classList.add('overflow-hidden');
+
+                // 使用 mask-image 实现边缘渐隐效果
+                const maskStyle = 'mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%); -webkit-mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);';
+
+                el.innerHTML = `
+                <div class="w-full relative" style="${maskStyle}">
+                    <div class="inline-block whitespace-nowrap animate-marquee hover:pause-animation">
+                        <span>${text}</span>${gap}<span>${text}</span>${gap}
+                    </div>
+                </div>`;
+            }
+        });
+    }, 50);
+}
+
+// Re-check marquees on resize
+window.addEventListener('resize', () => {
+    clearTimeout(window._marqueeResizeTimer);
+    window._marqueeResizeTimer = setTimeout(applyMarqueeChecks, 300);
+});
 
 // Lazy Loading Logic
 let imageObserver;
@@ -1286,12 +1355,28 @@ audio.addEventListener('play', () => {
         navigator.mediaSession.playbackState = 'playing';
         updatePositionState();
     }
+    // [Fix] 歌曲播放时自动同步歌词，并强制进入自动滚动模式
+    if (lyricPlayer) {
+        lyricPlayer.play(audio.currentTime * 1000);
+        isUserScrolling = false; // 切回自动滚动
+        scrollToActiveLine(true); // 立即对齐
+
+        // 隐藏滚动指示器
+        const indicator = document.getElementById('lyric-scroll-indicator');
+        if (indicator) {
+            indicator.classList.add('hidden');
+            indicator.style.display = 'none';
+        }
+    }
 });
 
 audio.addEventListener('pause', () => {
     if ('mediaSession' in navigator) {
         navigator.mediaSession.playbackState = 'paused';
         updatePositionState();
+    }
+    if (lyricPlayer) {
+        lyricPlayer.pause();
     }
 });
 
@@ -1320,7 +1405,17 @@ audio.addEventListener('ended', () => {
 // Additional events to sync progress
 audio.addEventListener('loadedmetadata', updatePositionState);
 audio.addEventListener('ratechange', updatePositionState);
-audio.addEventListener('seeked', updatePositionState);
+audio.addEventListener('seeked', () => {
+    updatePositionState();
+    if (lyricPlayer) {
+        lyricPlayer.play(audio.currentTime * 1000);
+    }
+});
+audio.addEventListener('waiting', () => {
+    if (lyricPlayer) {
+        lyricPlayer.pause();
+    }
+});
 
 // Initialize Media Session Actions
 if ('mediaSession' in navigator) {
@@ -2986,9 +3081,9 @@ async function renderCustomSources() {
             <div class="flex justify-between items-start">
                 <div class="flex-1 pr-4 min-w-0">
                     <div class="flex items-center gap-2 mb-1 flex-wrap">
-                        <div class="flex items-center gap-2">
-                            <i class="fas fa-file-code text-emerald-500"></i>
-                            <h4 class="font-bold text-gray-800 text-sm line-clamp-1 break-all" title="${source.name}">${source.name}</h4>
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                            <i class="fas fa-file-code text-emerald-500 flex-shrink-0"></i>
+                            ${createMarqueeHtml(source.name, "font-bold text-gray-800 text-sm")}
                         </div>
                         <div class="flex items-center gap-2">
                              <span class="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded shrink-0">v${source.version}</span>
@@ -3031,6 +3126,11 @@ async function renderCustomSources() {
             container.appendChild(div);
         });
     });
+
+    // Apply dynamic marquee checks after rendering source list
+    if (typeof applyMarqueeChecks === 'function') {
+        applyMarqueeChecks();
+    }
 }
 
 // 重新加载源 (强制重新启用)
@@ -3743,6 +3843,9 @@ window.addEventListener('resize', () => {
 function toggleDetailCover() {
     const cover = document.getElementById('mobile-player-cover-container');
     const container = document.getElementById('player-detail-container');
+    const lyricsWrapper = document.getElementById('lyrics-wrapper');
+    const lyricContent = document.getElementById('lyric-content');
+    const titleContainer = document.querySelector('#lyrics-wrapper > div:first-child'); // Title/Artist container
 
     if (!cover || !container) return;
 
@@ -3750,9 +3853,12 @@ function toggleDetailCover() {
     const isHidden = cover.classList.contains('opacity-0');
 
     if (!isHidden) {
-        // Hide Cover
-        // We set max-height to 0 to collapse it smoothly
+        // HIDE COVER
+        // Collapse dimensions
         cover.style.maxHeight = '0px';
+        cover.style.maxWidth = '0px'; // For desktop collapse
+        cover.style.margin = '0px';
+
         cover.classList.remove('mb-8', 'md:mb-0');
         // Fade out and shrink
         cover.classList.add('opacity-0', 'scale-90', 'border-0');
@@ -3761,15 +3867,46 @@ function toggleDetailCover() {
         container.classList.remove('pt-24');
         container.classList.add('pt-8'); // Less padding on top
 
+        // Center Lyrics on Desktop
+        if (lyricsWrapper) {
+            lyricsWrapper.classList.remove('md:w-1/2');
+            lyricsWrapper.classList.add('md:w-2/3', 'mx-auto', 'lyrics-centered'); // Centered and slightly wider
+        }
+
+        if (lyricContent) {
+            // Revert to mobile defaults (center)
+            lyricContent.classList.remove('md:items-start', 'md:text-left');
+        }
+
+        if (titleContainer) {
+            titleContainer.classList.remove('md:text-left');
+        }
+
     } else {
-        // Show Cover
-        cover.style.maxHeight = ''; // Remove inline style to revert to CSS class
-        // Restore styles
+        // SHOW COVER
+        cover.style.maxHeight = '';
+        cover.style.maxWidth = ''; // Restore
+        cover.style.margin = '';
+
         cover.classList.remove('opacity-0', 'scale-90', 'border-0');
 
         // Restore padding
         container.classList.add('pt-24');
         container.classList.remove('pt-8');
+
+        // Restore Layout
+        if (lyricsWrapper) {
+            lyricsWrapper.classList.add('md:w-1/2');
+            lyricsWrapper.classList.remove('md:w-2/3', 'mx-auto', 'lyrics-centered');
+        }
+
+        if (lyricContent) {
+            lyricContent.classList.add('md:items-start', 'md:text-left');
+        }
+
+        if (titleContainer) {
+            titleContainer.classList.add('md:text-left');
+        }
     }
 }
 

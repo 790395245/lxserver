@@ -14,6 +14,7 @@ import defaultConfig from './defaultConfig'
 import { ENV_PARAMS, File } from './constants'
 import { checkAndCreateDirSync } from './utils'
 
+// Declare Env Params Type
 type ENV_PARAMS_Type = typeof ENV_PARAMS
 type ENV_PARAMS_Value_Type = ENV_PARAMS_Type[number]
 
@@ -175,6 +176,9 @@ if (envParams.ENABLE_WEBPLAYER_AUTH) {
 if (envParams.WEBPLAYER_PASSWORD) {
   global.lx.config['player.password'] = envParams.WEBPLAYER_PASSWORD
 }
+if (envParams.DISABLE_TELEMETRY) {
+  global.lx.config.disableTelemetry = envParams.DISABLE_TELEMETRY === 'true'
+}
 
 if (envUsers.length) {
   const users: LX.Config['users'] = []
@@ -275,6 +279,7 @@ for (const user of global.lx.config.users) {
   checkAndCreateDir(dataPath)
   user.dataPath = dataPath
 }
+
 initLogger()
 
 

@@ -10,6 +10,7 @@ const config: LX.Config = {
 
   maxSnapshotNum: 10, // 公共最大备份快照数
   'list.addMusicLocationType': 'top', // 公共添加歌曲到我的列表时的位置 top | bottom，参考客户端的「设置 → 列表设置 → 添加歌曲到列表时的位置」
+  disableTelemetry: false, // 是否禁用数据收集（仅用于开源项目改进，不含敏感信息）
 
   users: [
     // 用户配置例子

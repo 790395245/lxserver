@@ -171,7 +171,9 @@ http://localhost:9527
 | `WEBDAV_PASSWORD`       | `webdav.password`   | WebDAV 密码                       | -                  |
 | `SYNC_INTERVAL`         | `sync.interval`     | WebDAV 自动备份间隔(分钟)         | `60`             |
 | `ENABLE_WEBPLAYER_AUTH` | `player.enableAuth` | 是否启用 Web 播放器访问密码       | `false`          |
+| `ENABLE_WEBPLAYER_AUTH` | `player.enableAuth` | 是否启用 Web 播放器访问密码       | `false`          |
 | `WEBPLAYER_PASSWORD`    | `player.password`   | Web 播放器访问密码                | 123456             |
+| `DISABLE_TELEMETRY`     | `disableTelemetry`  | 是否禁用匿名数据统计              | `false`          |
 
 ### 用户配置
 
@@ -225,6 +227,14 @@ server {
 }
 ```
 
+## 🛡️ 数据收集与隐私说明
+
+本项目集成了 PostHog 匿名数据统计，**仅用于帮助开源作者发现 Bug 和评估项目使用情况**。
+
+- **收集内容**：仅包含随机生成的 UUID (Instance ID)、应用版本号、操作系统类型、运行环境 (Docker/Node) 等非敏感数据。
+- **绝对匿名**：**绝不收集** 用户的 IP 地址、主机名、地理位置或任何具体的用户数据。
+- **如何关闭**：你可以随时通过设置环境变量 `DISABLE_TELEMETRY=true` 来完全禁用此功能（默认为 `false`）。
+
 ## 🤝 贡献与致谢
 
 本项目修改自 [lyswhut/lx-music-sync-server](https://github.com/lyswhut/lx-music-sync-server)，WEB页端LX的实现参考[ lx-music-desktop](https://github.com/lyswhut/lx-music-desktop) ，感谢 lyswhut，接口实现通过 [lx-music-desktop](https://github.com/lyswhut/lx-music-desktop) 项目的 musicsdk 实现。
@@ -233,4 +243,4 @@ server {
 
 ## 📄 开源协议
 
-Apache License 2.0
+Apache License 2.0 copyright (c) 2026 [xcq0607](https://github.com/xcq0607)

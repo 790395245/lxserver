@@ -6,7 +6,7 @@
   <h1>LX Music Sync Server</h1>
   <p>
     <img src="https://img.shields.io/badge/version-{{version}}-blue?style=flat-square" alt="Version">
-    <img src="https://img.shields.io/badge/license-Apache%202.0-orange?style=flat-square" alt="License">
+    <a href="/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-orange?style=flat-square" alt="License"></a>
   </p>
 </div>
 
@@ -71,3 +71,5 @@ WEB页端LX的实现参考 [lx-music-desktop](https://github.com/lyswhut/lx-musi
     GitHub 仓库
   </a>
 </div>
+
+Copyright © 2026 [xcq0607](https://github.com/xcq0607)
