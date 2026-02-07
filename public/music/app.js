@@ -1912,6 +1912,29 @@ async function fetchLyric(song) {
     }
 }
 
+// Helper function to calculate lyric offset (Center Line)
+function getLyricOffset() {
+    const containerBox = document.getElementById('lyric-container');
+    if (!containerBox) return 0;
+
+    // 复用逻辑：桌面端对齐封面，移动端根据Footer状态调整
+    const cover = document.getElementById('detail-cover');
+    const footer = document.getElementById('player-footer');
+    const isFooterHidden = footer && footer.classList.contains('translate-y-[110%]');
+
+    // 桌面端且封面存在
+    if (window.innerWidth >= 768 && cover) {
+        const coverRect = cover.getBoundingClientRect();
+        const containerRect = containerBox.getBoundingClientRect();
+        // 计算封面中心相对于容器顶部的偏移量
+        return (coverRect.top + coverRect.height / 2) - containerRect.top;
+    } else {
+        // 移动端
+        const ratio = isFooterHidden ? 0.3 : 0.2;
+        return containerBox.clientHeight * ratio;
+    }
+}
+
 // Helper to scroll to active line
 function scrollToActiveLine(force = false) {
     if (isUserScrolling && !force) return;
@@ -1933,25 +1956,7 @@ function scrollToActiveLine(force = false) {
     const lineTop = currentLine.offsetTop;
 
     // 计算目标参考线位置
-    let offsetInContainer;
-    const cover = document.getElementById('detail-cover');
-    const footer = document.getElementById('player-footer');
-    // 判断底部栏是否隐藏 (移动端隐藏时应该居中)
-    const isFooterHidden = footer && footer.classList.contains('translate-y-[110%]');
-
-    // 桌面端且封面存在时，对齐到封面中心
-    if (window.innerWidth >= 768 && cover) {
-        const coverRect = cover.getBoundingClientRect();
-        const containerRect = containerBox.getBoundingClientRect();
-        // 计算封面中心相对于容器顶部的偏移量
-        offsetInContainer = (coverRect.top + coverRect.height / 2) - containerRect.top;
-    } else {
-        // 移动端: 
-        // 1. 如果底部栏隐藏(全屏歌词)，使用 30% 
-        // 2. 否则使用 20%
-        const ratio = isFooterHidden ? 0.3 : 0.2;
-        offsetInContainer = containerBox.clientHeight * ratio;
-    }
+    const offsetInContainer = getLyricOffset();
 
     const targetScroll = lineTop - offsetInContainer;
 
@@ -2014,7 +2019,15 @@ function handleLyricScroll() {
 
     // 显示指示器
     const indicator = document.getElementById('lyric-scroll-indicator');
-    if (indicator) {
+    const container = document.getElementById('lyric-container');
+    if (indicator && container) {
+        // [Fix] 每次显示时动态更新高度，确保与自动滚动对齐点一致
+        // indicator 是绝对定位在 lyrics-wrapper 内 (父容器)
+        // offset 是相对于 lyric-container 顶部的距离 (子容器)
+        // lyric-container 顶部可能有 Title 占据空间，因此需要加上 container.offsetTop
+        const offset = getLyricOffset();
+        indicator.style.top = `${container.offsetTop + offset}px`;
+
         indicator.classList.remove('hidden');
         indicator.style.display = 'flex';
     }
@@ -2085,25 +2098,8 @@ function updateScrollIndicator() {
     }
 
 
-    // 初始化虚线位置（只在第一次调用时设置，之后固定不动）
-    if (!indicator.dataset.positioned) {
-        let referenceTop;
-        const cover = document.getElementById('detail-cover');
-        const parent = indicator.parentElement;
-        const parentRect = parent.getBoundingClientRect();
-
-        if (window.innerWidth >= 768 && cover) {
-            // 桌面端：对齐封面中心
-            const coverRect = cover.getBoundingClientRect();
-            referenceTop = (coverRect.top + coverRect.height / 2) - parentRect.top;
-        } else {
-            // 移动端：38%
-            referenceTop = parentRect.height * 0.38;
-        }
-
-        indicator.style.top = `${referenceTop}px`;
-        indicator.dataset.positioned = 'true';
-    }
+    // [Refactor] 虚线位置已在 handleLyricScroll 中动态设置，这里不再需要一次性初始化
+    // 且现在完全依赖 getLyricOffset() 保证位置统一
 
     // 直接获取虚线的实际屏幕位置
     const indicatorRect = indicator.getBoundingClientRect();
@@ -3966,6 +3962,7 @@ function toggleDetailCover() {
 function togglePlayerPanel() {
     const footer = document.getElementById('player-footer');
     const expandBtn = document.getElementById('btn-expand-panel');
+    const container = document.getElementById('player-detail-container');
 
     if (!footer || !expandBtn) return;
 
@@ -3997,6 +3994,11 @@ function togglePlayerPanel() {
             playerDetail.classList.remove('pb-0');
         }
 
+        // 桌面端: 恢复 md:pt-0 (垂直居中, 无顶部Padding)
+        if (container) {
+            container.classList.add('md:pt-0');
+        }
+
         // 歌词高度限制: 恢复限制
         if (lyricsWrapper) {
             lyricsWrapper.classList.add('max-h-[60vh]');
@@ -4020,6 +4022,11 @@ function togglePlayerPanel() {
         if (playerDetail) {
             playerDetail.classList.remove('pb-24');
             playerDetail.classList.add('pb-0');
+        }
+
+        // 桌面端: 移除 md:pt-0, 使用 pt-24 (避免遮挡顶部 NOW PLAYING)
+        if (container) {
+            container.classList.remove('md:pt-0');
         }
 
         // 歌词高度限制: 该满屏
