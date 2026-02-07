@@ -1,0 +1,41 @@
+[
+    {
+        "comment": "=== 欢迎标语 (只显示一次) ===",
+        "id": "welcome_slogan_v1",
+        "status": "active",
+        "type": "broadcast",
+        "logic": {
+            "interval_hours": -1
+        },
+        "ui": {
+            "title": "🎉 欢迎使用搜索音乐",
+            "message": "在这个纯净的音乐世界里，每一秒都是享受。\n祝您听歌愉快！",
+            "confirm_text": "开始探索",
+            "cancel_text": ""
+        },
+        "action": {
+            "type": "close"
+        }
+    },
+    {
+        "comment": "=== 版本更新 v1.2.2 ===",
+        "id": "update_v1_2_2",
+        "status": "active",
+        "type": "version",
+        "logic": {
+            "target_version": "v1.2.2",
+            "operator": "<",
+            "interval_hours": 24
+        },
+        "ui": {
+            "title": "发现新版本 v1.2.2",
+            "message": "本次更新优化了多项体验：\n1. 修复列表加载卡顿\n2. 优化歌词滚动效果\n3.增加了提醒系统\n建议您尽快更新。",
+            "confirm_text": "去更新",
+            "cancel_text": "稍后提醒"
+        },
+        "action": {
+            "type": "link",
+            "url": "https://github.com/XCQ0607/lxserver/releases/tag/v1.2.2"
+        }
+    }
+]

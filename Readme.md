@@ -8,7 +8,7 @@
   <h1>LX Sync Server</h1> -->
   <p>
     <img src="https://img.shields.io/badge/build-passing-brightgreen?style=flat-square" alt="Build Status">
-    <img src="https://img.shields.io/badge/version-v1.2.1-blue?style=flat-square" alt="Version">
+    <img src="https://img.shields.io/badge/version-v1.2.2-blue?style=flat-square" alt="Version">
     <img src="https://img.shields.io/badge/license-Apache%202.0-orange?style=flat-square" alt="License">
     <img src="https://img.shields.io/badge/node-%3E%3D16-green?style=flat-square" alt="Node Version">
   </p>
@@ -158,22 +158,22 @@ http://localhost:9527
 
 支持使用环境变量覆盖 `config.js` 中的配置（Docker 部署时非常有用）：
 
-| 环境变量                  | 对应配置项            | 说明                              | 默认值             |
-| ------------------------- | --------------------- | --------------------------------- | ------------------ |
-| `PORT`                  | `port`              | 服务端口                          | `9527`           |
-| `BIND_IP`               | `bindIP`            | 绑定 IP                           | `0.0.0.0`        |
-| `FRONTEND_PASSWORD`     | `frontend.password` | Web 管理界面访问密码              | `123456`         |
-| `SERVER_NAME`           | `serverName`        | 同步服务名称                      | `My Sync Server` |
-| `MAX_SNAPSHOT_NUM`      | `maxSnapshotNum`    | 保留的最大快照数量                | `10`             |
-| `PROXY_HEADER`          | `proxy.header`      | 代理转发 IP 头 (如 `x-real-ip`) | -                  |
-| `WEBDAV_URL`            | `webdav.url`        | WebDAV 地址                       | -                  |
-| `WEBDAV_USERNAME`       | `webdav.username`   | WebDAV 用户名                     | -                  |
-| `WEBDAV_PASSWORD`       | `webdav.password`   | WebDAV 密码                       | -                  |
-| `SYNC_INTERVAL`         | `sync.interval`     | WebDAV 自动备份间隔(分钟)         | `60`             |
-| `ENABLE_WEBPLAYER_AUTH` | `player.enableAuth` | 是否启用 Web 播放器访问密码       | `false`          |
-| `ENABLE_WEBPLAYER_AUTH` | `player.enableAuth` | 是否启用 Web 播放器访问密码       | `false`          |
-| `WEBPLAYER_PASSWORD`    | `player.password`   | Web 播放器访问密码                | 123456             |
-| `DISABLE_TELEMETRY`     | `disableTelemetry`  | 是否禁用匿名数据统计              | `false`          |
+| 环境变量                  | 对应配置项            | 说明                                               | 默认值             |
+| ------------------------- | --------------------- | -------------------------------------------------- | ------------------ |
+| `PORT`                  | `port`              | 服务端口                                           | `9527`           |
+| `BIND_IP`               | `bindIP`            | 绑定 IP                                            | `0.0.0.0`        |
+| `FRONTEND_PASSWORD`     | `frontend.password` | Web 管理界面访问密码                               | `123456`         |
+| `SERVER_NAME`           | `serverName`        | 同步服务名称                                       | `My Sync Server` |
+| `MAX_SNAPSHOT_NUM`      | `maxSnapshotNum`    | 保留的最大快照数量                                 | `10`             |
+| `PROXY_HEADER`          | `proxy.header`      | 代理转发 IP 头 (如 `x-real-ip`)                  | -                  |
+| `WEBDAV_URL`            | `webdav.url`        | WebDAV 地址                                        | -                  |
+| `WEBDAV_USERNAME`       | `webdav.username`   | WebDAV 用户名                                      | -                  |
+| `WEBDAV_PASSWORD`       | `webdav.password`   | WebDAV 密码                                        | -                  |
+| `SYNC_INTERVAL`         | `sync.interval`     | WebDAV 自动备份间隔(分钟)                          | `60`             |
+| `ENABLE_WEBPLAYER_AUTH` | `player.enableAuth` | 是否启用 Web 播放器访问密码                        | `false`          |
+| `ENABLE_WEBPLAYER_AUTH` | `player.enableAuth` | 是否启用 Web 播放器访问密码                        | `false`          |
+| `WEBPLAYER_PASSWORD`    | `player.password`   | Web 播放器访问密码                                 | 123456             |
+| `DISABLE_TELEMETRY`     | `disableTelemetry`  | 是否禁用匿名数据统计，系统更新提示以及系统公告提示 | `false`          |
 
 ### 用户配置
 
@@ -229,11 +229,18 @@ server {
 
 ## 🛡️ 数据收集与隐私说明
 
-本项目集成了 PostHog 匿名数据统计，**仅用于帮助开源作者发现 Bug 和评估项目使用情况**。
+## 🛡️ 数据收集与隐私说明
 
+本项目集成了 PostHog 匿名数据统计，主要用于 **帮助开源作者发现 Bug** 以及 **推送重要的系统通知**。
+
+- **核心用途**：
+  1. **匿名统计**：收集版本号、运行环境等非敏感数据，帮助优化项目。
+  2. **通知推送**：通过 PostHog 的 Feature Flag 功能推送 **版本更新提醒** 和 **紧急公告**。
 - **收集内容**：仅包含随机生成的 UUID (Instance ID)、应用版本号、操作系统类型、运行环境 (Docker/Node) 等非敏感数据。
 - **绝对匿名**：**绝不收集** 用户的 IP 地址、主机名、地理位置或任何具体的用户数据。
-- **如何关闭**：你可以随时通过设置环境变量 `DISABLE_TELEMETRY=true` 来完全禁用此功能（默认为 `false`）。
+- **关于关闭**：
+  - 你可以随时通过设置环境变量 `DISABLE_TELEMETRY=true` 来完全禁用此功能（默认为 `false`）。
+  - **⚠️ 注意**：如果关闭此功能，您将 **无法收到** 版本更新提醒和重要的系统维护通知。
 
 ## 🤝 贡献与致谢
 
