@@ -37,7 +37,7 @@ jobs:
       - name: Read version from config
         id: get_version
         run: |
-          VERSION=$(grep "version:" public/config.js | sed "s/.*'\(.*\)'.*/\1/")
+          VERSION=$(grep "version:" public/js/config.js | sed "s/.*'\(.*\)'.*/\1/")
           echo "PROJECT_VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Extract metadata (tags, labels) for Docker
