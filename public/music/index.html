@@ -76,6 +76,8 @@
         }
 
         .lyric-line {
+            font-family: var(--lyric-font-family, inherit);
+            font-size: var(--lyric-font-size, 1.25rem);
             transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
             cursor: pointer;
             opacity: 0.4;
@@ -744,12 +746,12 @@
                             <h3 class="font-bold text-gray-800 text-sm mb-3 flex items-center">
                                 <i class="fas fa-list-ol mr-2 text-emerald-500"></i> 热搜显示数量 (Hot Search Limit)
                             </h3>
-                            <div class="flex items-center justify-between">
-                                <div class="text-xs text-gray-500 mr-4">
+                            <div class="flex flex-col md:flex-row md:items-center justify-between">
+                                <div class="text-xs text-gray-500 mb-2 md:mb-0 md:mr-4">
                                     设置搜索页面显示的热门搜索词数量 (0-50，设置为0关闭显示)<br>
                                     <span class="text-[10px] opacity-70">* 实际数量取决于源，可能少于设置值</span>
                                 </div>
-                                <div class="w-24">
+                                <div class="w-full md:w-24">
                                     <input type="number" id="hot-search-limit-input"
                                         class="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-emerald-400 transition-all"
                                         value="20" min="0" max="50" onchange="changeHotSearchLimit(this.value)">
@@ -762,17 +764,76 @@
                             <h3 class="font-bold text-gray-800 text-sm mb-3 flex items-center">
                                 <i class="fas fa-font mr-2 text-emerald-500"></i> 歌词字体大小 (Lyric Font Size)
                             </h3>
-                            <div class="flex items-center justify-between">
-                                <div class="text-xs text-gray-500 mr-4">
+                            <div class="flex flex-col md:flex-row md:items-center justify-between">
+                                <div class="text-xs text-gray-500 mb-2 md:mb-0 md:mr-4">
                                     设置播放详情页歌词显示的大小 (单位: rem)
                                 </div>
-                                <div class="flex items-center gap-3 w-40">
+                                <div class="flex items-center gap-3 w-full md:w-40">
                                     <input type="range" id="lyric-font-size-slider"
                                         class="flex-1 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-emerald-500"
                                         min="0.8" max="3.0" step="0.1" value="1.2"
                                         oninput="changeLyricFontSize(this.value)">
                                     <span id="lyric-font-size-value"
                                         class="text-sm font-mono text-emerald-600 w-8">1.2</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Lyric Font Family -->
+                        <div class="bg-white rounded-xl border border-gray-100 p-4 hover:shadow-sm transition-shadow">
+                            <h3 class="font-bold text-gray-800 text-sm mb-3 flex items-center">
+                                <i class="fas fa-font mr-2 text-emerald-500"></i> 歌词字体 (Lyric Font Family)
+                            </h3>
+                            <div class="flex flex-col md:flex-row md:items-center justify-between">
+                                <div class="text-xs text-gray-500 mb-2 md:mb-0 md:mr-4">
+                                    设置歌词显示的字体 (支持本地安装的字体，如 'SimHei', 'Microsoft YaHei')
+                                </div>
+                                <div class="flex items-center gap-3 w-full md:w-64">
+                                    <div class="relative flex-1">
+                                        <select id="lyric-font-family-select"
+                                            class="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 transition-all appearance-none bg-white pr-8"
+                                            onchange="changeLyricFontFamily(this.value)">
+                                            <option value="">默认字体</option>
+                                            <optgroup label="常用中文字体">
+                                                <option value="Microsoft YaHei">微软雅黑 (Microsoft YaHei)</option>
+                                                <option value="SimHei">黑体 (SimHei)</option>
+                                                <option value="KaiTi">楷体 (KaiTi)</option>
+                                                <option value="SimSun">宋体 (SimSun)</option>
+                                                <option value="FangSong">仿宋 (FangSong)</option>
+                                            </optgroup>
+                                            <optgroup label="常用英文字体">
+                                                <option value="Arial">Arial</option>
+                                                <option value="Segoe UI">Segoe UI</option>
+                                                <option value="Times New Roman">Times New Roman</option>
+                                                <option value="Roboto">Roboto</option>
+                                            </optgroup>
+                                        </select>
+                                        <div
+                                            class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                                            <i class="fas fa-chevron-down text-xs"></i>
+                                        </div>
+                                    </div>
+                                    <button onclick="loadLocalFonts()"
+                                        class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs transition-colors whitespace-nowrap"
+                                        title="尝试读取系统安装的所有字体 (需要浏览器支持)">
+                                        <i class="fas fa-sync-alt mr-1"></i>读取
+                                    </button>
+                                </div>
+                            </div>
+                            <!-- Font Preview Panel -->
+                            <div
+                                class="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200 text-center transition-all duration-300">
+                                <div class="text-xs text-gray-400 mb-2">字体预览 (Preview)</div>
+                                <div id="lyric-font-preview" style="font-family: var(--lyric-font-family, inherit);">
+                                    <div class="text-xl font-bold text-gray-800 break-words tracking-widest mb-2">
+                                        0123456789
+                                    </div>
+                                    <div class="text-lg text-gray-700 break-words mb-2">
+                                        The Quick Brown Fox Jumps Over The Lazy Dog
+                                    </div>
+                                    <div class="text-2xl font-medium text-gray-800 break-words">
+                                        落霞与孤鹜齐飞，秋水共长天一色
+                                    </div>
                                 </div>
                             </div>
                         </div>

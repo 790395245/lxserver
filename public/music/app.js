@@ -31,7 +31,8 @@ let settings = {
     enableProxyPlayback: false, // 播放音乐代理
     enableProxyDownload: false, // 下载音乐代理
     hotSearchLimit: 20, // 热搜显示数量
-    lyricFontSize: 1.25 // 歌词字体大小 (rem)
+    lyricFontSize: 1.25, // 歌词字体大小 (rem)
+    lyricFontFamily: '' // 歌词字体
 };
 
 // 从 localStorage 加载设置
@@ -206,6 +207,24 @@ document.addEventListener('DOMContentLoaded', () => {
         lyricFontSizeValue.innerText = size;
         document.documentElement.style.setProperty('--lyric-font-size', `${size}rem`);
     }
+
+    // Initialize Lyric Font Family UI
+    const lyricFontFamilySelect = document.getElementById('lyric-font-family-select');
+    if (lyricFontFamilySelect) {
+        const fontFamily = settings.lyricFontFamily || '';
+        // Check if value exists in default options, if not create it (unless empty)
+        if (fontFamily) {
+            let exists = Array.from(lyricFontFamilySelect.options).some(opt => opt.value === fontFamily);
+            if (!exists) {
+                const option = document.createElement('option');
+                option.value = fontFamily;
+                option.textContent = fontFamily; // Fallback display name
+                lyricFontFamilySelect.add(option, null);
+            }
+            lyricFontFamilySelect.value = fontFamily;
+            document.documentElement.style.setProperty('--lyric-font-family', fontFamily);
+        }
+    }
 });
 
 // 切换代理设置
@@ -257,6 +276,78 @@ function changeLyricFontSize(value) {
 
         console.log(`[Settings] Lyric Font Size: ${size}rem`);
     }
+}
+
+// 读取本地字体
+async function loadLocalFonts() {
+    if (!('queryLocalFonts' in window)) {
+        alert('抱歉，您的浏览器不支持读取本地字体功能 (Local Font Access API)。\n建议使用 Chrome / Edge 浏览器，并确保在 HTTPS 环境下使用。');
+        return;
+    }
+
+    const btn = document.querySelector('button[onclick="loadLocalFonts()"]');
+    const originalText = btn.innerHTML;
+    try {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>读取中...';
+
+        const fonts = await window.queryLocalFonts();
+        const fontSelect = document.getElementById('lyric-font-family-select');
+
+        // Use a set to store unique families
+        const fontFamilies = new Set();
+        fonts.forEach(font => fontFamilies.add(font.family));
+
+        // Sort alphabetically
+        const sortedFamilies = Array.from(fontFamilies).sort();
+
+        if (sortedFamilies.length === 0) {
+            alert('未能获取到字体列表');
+            return;
+        }
+
+        // Remove existing local fonts group if exists
+        const oldGroup = fontSelect.querySelector('optgroup[data-source="local"]');
+        if (oldGroup) {
+            oldGroup.remove();
+        }
+
+        // Create a single group for local fonts
+        const group = document.createElement('optgroup');
+        group.dataset.source = 'local';
+        group.label = `本地已安装字体 (${sortedFamilies.length})`;
+
+        sortedFamilies.forEach(family => {
+            const option = document.createElement('option');
+            option.value = family;
+            option.textContent = family;
+            group.appendChild(option);
+        });
+        fontSelect.appendChild(group);
+
+        // Restore selection if match
+        if (settings.lyricFontFamily) {
+            fontSelect.value = settings.lyricFontFamily;
+        }
+
+        alert(`成功获取 ${sortedFamilies.length} 个字体！`);
+
+    } catch (err) {
+        console.error('[Font] Error loading fonts:', err);
+        alert('获取字体失败: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+}
+
+function changeLyricFontFamily(value) {
+    settings.lyricFontFamily = value.trim();
+    localStorage.setItem('lx_settings', JSON.stringify(settings));
+
+    // Apply style
+    document.documentElement.style.setProperty('--lyric-font-family', settings.lyricFontFamily || 'inherit');
+    console.log(`[Settings] Lyric Font Family: ${settings.lyricFontFamily}`);
 }
 
 // 切换音质偏好
