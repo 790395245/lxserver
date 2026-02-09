@@ -1360,8 +1360,14 @@ function updatePlayerInfo(song) {
     // Actually, 'default' is usually the play queue. We check 'loveList' and 'userList'.
     let isCollected = false;
     if (currentListData) {
-        if (currentListData.loveList.some(s => s.id === song.id)) isCollected = true;
-        if (currentListData.userList.some(ul => ul.list.some(s => s.id === song.id))) isCollected = true;
+        let checkId = song.id;
+        // [Fix] Check for QQ Music prefixed ID
+        if (song.source === 'tx' && song.songmid && !song.id.startsWith('tx_')) {
+            checkId = `tx_${song.songmid}`;
+        }
+
+        if (currentListData.loveList.some(s => s.id === song.id || s.id === checkId)) isCollected = true;
+        if (currentListData.userList.some(ul => ul.list.some(s => s.id === song.id || s.id === checkId))) isCollected = true;
     }
 
     // Bind click to Open Modal
@@ -2750,11 +2756,31 @@ async function toggleLove() {
     if (!currentListData || currentIndex < 0) return;
     const song = currentPlaylist[currentIndex];
 
-    const index = currentListData.loveList.findIndex(s => s.id === song.id);
+    // [Fix] Handle QQ Music ID format consistency
+    let targetId = song.id;
+    if (song.source === 'tx' && song.songmid && !song.id.startsWith('tx_')) {
+        targetId = `tx_${song.songmid}`;
+    }
+
+    const index = currentListData.loveList.findIndex(s => s.id === targetId || s.id === song.id);
     if (index >= 0) {
         currentListData.loveList.splice(index, 1);
     } else {
-        currentListData.loveList.push(song);
+        if (song.source === 'tx') {
+            const songToSave = JSON.parse(JSON.stringify(song));
+            if (song.songmid) {
+                songToSave.id = `tx_${song.songmid}`;
+                if (!songToSave.meta) songToSave.meta = {};
+                songToSave.meta.songId = song.songmid;
+                if (song.songId) songToSave.meta.id = song.songId;
+                if (song.albumMid) songToSave.meta.albumMid = song.albumMid;
+                if (song.albumId) songToSave.meta.albumId = song.albumId;
+                if (song.strMediaMid) songToSave.meta.strMediaMid = song.strMediaMid;
+            }
+            currentListData.loveList.push(songToSave);
+        } else {
+            currentListData.loveList.push(song);
+        }
     }
 
     // Update UI immediately
@@ -3501,6 +3527,11 @@ function cleanSongData(song) {
     // 1. Resolve Song ID (songId or songmid or id)
     // Different sources/APIs place the ID in different spots
     let songId = sourceMeta.songId || song.songId || song.songmid || song.id;
+
+    // [Fix] 针对 QQ 音乐 (tx)，强制使用 songmid 作为主 ID，避免使用数字 ID
+    if (song.source === 'tx' && song.songmid) {
+        songId = song.songmid;
+    }
 
     // 2. Resolve Album Name
     let albumName = sourceMeta.albumName || song.albumName || song.album?.name || '';
