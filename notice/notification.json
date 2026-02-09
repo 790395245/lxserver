@@ -18,24 +18,24 @@
         }
     },
     {
-        "comment": "=== 版本更新 v1.2.2 ===",
-        "id": "update_v1_2_2",
+        "comment": "=== 版本更新 v1.2.3 ===",
+        "id": "update_v1_2_3",
         "status": "active",
         "type": "version",
         "logic": {
-            "target_version": "v1.2.2",
+            "target_version": "v1.2.3",
             "operator": "<",
             "interval_hours": 24
         },
         "ui": {
-            "title": "发现新版本 v1.2.2",
-            "message": "本次更新优化了多项体验：\n1. 修复列表加载卡顿\n2. 优化歌词滚动效果\n3.增加了提醒系统\n建议您尽快更新。",
+            "title": "发现新版本 v1.2.3",
+            "message": "本次更新优化了多项体验：\n1. 修复歌词放大后显示被截断的问题\n2. 优化歌词自动换行逻辑\n3. 修复部分界面显示问题\n建议您尽快更新。",
             "confirm_text": "去更新",
             "cancel_text": "稍后提醒"
         },
         "action": {
             "type": "link",
-            "url": "https://github.com/XCQ0607/lxserver/releases/tag/v1.2.2"
+            "url": "https://github.com/XCQ0607/lxserver/releases/tag/v1.2.3"
         }
     }
 ]
