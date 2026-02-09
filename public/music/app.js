@@ -2267,7 +2267,6 @@ function renderLyric(lines, emptyMsg = '暂无歌词') {
     const frag = document.createDocumentFragment();
 
     lines.forEach((line, idx) => {
-        // Create line container with classes mirroring the desktop app's logic
         const div = document.createElement('div');
         div.className = `lyric-line relative py-2 px-1 text-center transition-all duration-300`;
         div.dataset.time = line.time;
@@ -3130,12 +3129,12 @@ function updateSourceScopeUI() {
     // Tag Content Logic
     let tagHtml = '';
     if (isPublic) {
-        tagHtml = `<span class="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-700 border border-blue-200">公开</span>`;
+        tagHtml = `<span class="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-700 border border-blue-200 whitespace-nowrap inline-block">公开</span>`;
     } else {
         // User logged in
-        let userTag = `<span class="px-2 py-0.5 rounded text-xs font-bold bg-purple-100 text-purple-700 border border-purple-200">${username}</span>`;
+        let userTag = `<span class="px-2 py-0.5 rounded text-xs font-bold bg-purple-100 text-purple-700 border border-purple-200 whitespace-nowrap inline-block">${username}</span>`;
         if (showPublic) {
-            userTag += `<span class="ml-1 px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-700 border border-blue-200">公开</span>`
+            userTag += `<span class="ml-1 px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-700 border border-blue-200 whitespace-nowrap inline-block">公开</span>`
         }
         tagHtml = userTag;
     }
@@ -4028,7 +4027,6 @@ function toggleDetailCover() {
 
     if (!isHidden) {
         // HIDE COVER
-        // ... (existing cover hiding logic)
         cover.style.maxHeight = '0px';
         cover.style.maxWidth = '0px';
         cover.style.margin = '0px';
@@ -4070,12 +4068,12 @@ function toggleDetailCover() {
 
         if (lyricContent) {
             lyricContent.classList.add('md:items-start', 'md:text-left');
-            lyricContent.classList.remove('items-center', 'text-center');
+            lyricContent.classList.add('items-center', 'text-center');
         }
 
         if (titleParent) {
             titleParent.classList.add('md:text-left');
-            titleParent.classList.remove('text-center');
+            titleParent.classList.add('text-center');
         }
     }
 }

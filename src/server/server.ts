@@ -1280,7 +1280,7 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
         void readBody(req).then(async body => {
           try {
             const { songInfo, quality } = JSON.parse(body)
-            console.log('[MusicUrl] Song Info:', JSON.stringify(songInfo, null, 2))
+            // console.log('[MusicUrl] Song Info:', JSON.stringify(songInfo, null, 2))
             if (!songInfo || !songInfo.source) {
               throw new Error('Invalid songInfo')
             }

@@ -531,10 +531,6 @@ class RemoteClient {
 
         // 1. Handle RPC Calls (requests from server)
         if (action.name || action.action) {
-            // For some reason, lx-music-desktop server might send action wrapped in name for RPC, 
-            // but `onListSyncAction` is also an RPC call with name='onListSyncAction'.
-            // Or sometimes it pushes data directly? 
-            // Logic in desktop: client.remote[name](...args)
             this.handleRPC(action);
             return;
         }
@@ -697,25 +693,8 @@ class RemoteClient {
     async sendData(action, data) {
         if (!this.isConnected) throw new Error('Not connected');
 
-        // Logic for PUSHING data changes to remote
-        // lx-music-desktop 'pushDataChange' usually involves calling 'onListSyncAction' on remote?
-        // Actually, desktop sync pushes local changes via 'listEvent.ts' which calls 'sendListAction'.
-        // We probably need to simulate 'sendListAction' if we want to push changes.
-        // But the 'sync()' method in SyncManager (old) was just doing full pull/push.
-
-        // If we are in 'remote' mode, we should really be sending specific actions.
-        // But for simply saving, maybe 'list_data_overwrite' action?
-        // Let's implement 'push' as 'list_data_overwrite' for now (simplest).
-
         return new Promise((resolve, reject) => {
-            // We can't use pendingRequests logic for one-way events easily unless we wrap in RPC.
-            // But server expects us to call 'onListSyncAction' on it?
-            // No, server expects us to respond to its calls.
-            // Wait, if WE change data, we need to notify server.
-            // How does desktop notification work?
-            // It calls `sendListAction` -> `message2read.remoteQueueList.onListSyncAction({ action, data })`
 
-            // So we need to call `onListSyncAction` on the SERVER.
             const payload = {
                 name: 'onListSyncAction',
                 // path: ['list', 'onListSyncAction'], 
@@ -734,9 +713,7 @@ class RemoteClient {
 
     startHeartbeat() {
         if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
-        // Browser handles Ping/Pong automatically.
-        // We only need local watchdog if strictly needed, but server will disconnect us if we fail.
-        // We don't need to send data to keep alive if server pings us.
+
         this.heartbeatTimer = setInterval(() => {
             // this.ws.send('1'); 
         }, 30000);
@@ -782,11 +759,7 @@ const SyncManager = {
         if (!this.client) throw new Error('Client not Init');
         if (this.mode === 'local') return await this.client.getList();
 
-        // Remote Mode: trigger sync start?
-        // With RPC, server drives it. We just wait.
-        // But we might want initial data if we think we are empty?
-        // Desktop sends 'finished' call?
-        // Actually, just connecting starts the process on server side?
+
         return null;
     },
     async push(data) {
