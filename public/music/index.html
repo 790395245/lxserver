@@ -5,6 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LX Music Web</title>
+    <!-- Config MUST be loaded before PostHog -->
+    <script src="/js/config.js"></script>
     <!-- PostHog Analytics -->
     <script>
         if (!window.CONFIG || !window.CONFIG.disableTelemetry) {
@@ -19,7 +21,6 @@
     <script src="/music/js/tailwind_setup.js"></script>
     <link rel="stylesheet" href="/music/assets/fontawesome/css/all.min.css">
     <script src="/music/js/crypto-js.min.js"></script>
-    <script src="/js/config.js"></script>
     <script src="/music/js/marked.min.js"></script>
     <script src="/js/notification-engine.js"></script>
     <style>
@@ -177,6 +178,60 @@
             visibility: visible !important;
         }
 
+        /* Sleep Timer Styles */
+        .timer-preset-btn {
+            padding: 0.75rem 1rem;
+            background-color: #f9fafb;
+            color: #4b5563;
+            font-weight: 700;
+            border-radius: 1rem;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+            font-size: 0.875rem;
+            text-align: center;
+        }
+
+        .timer-preset-btn:hover {
+            background-color: #ecfdf5;
+            color: #059669;
+            border-color: #d1fae5;
+            transform: translateY(-1px);
+        }
+
+        .timer-preset-btn:active {
+            transform: translateY(0);
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .animate-slide-up {
+            animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
         /* Lyric Font Size Variable */
         :root {
             --lyric-font-size: 1.25rem;
@@ -188,6 +243,19 @@
 
         .lyric-line .extended {
             font-size: 0.7em !important;
+        }
+
+        /* 隐藏滚动条但保留滚动能力 */
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            /* IE and Edge */
+            scrollbar-width: none;
+            /* Firefox */
+        }
+
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+            /* Chrome, Safari and Opera */
         }
     </style>
 </head>
@@ -354,6 +422,14 @@
                         <i class="fas fa-bars text-xl"></i>
                     </button>
                     <div class="active-tab-title text-lg font-bold text-gray-700 truncate" id="page-title">搜索音乐</div>
+                    <!-- Sleep Timer Trigger -->
+                    <div id="sleep-timer-trigger"
+                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-full hover:bg-gray-100 cursor-pointer transition-all border border-transparent hover:border-gray-200 group ml-1"
+                        onclick="openSleepTimerModal()" title="睡眠定时">
+                        <i class="far fa-clock text-gray-400 group-hover:text-emerald-500 transition-colors"></i>
+                        <span id="sleep-timer-countdown"
+                            class="text-xs font-mono font-bold text-emerald-600 hidden">00:00</span>
+                    </div>
                 </div>
 
                 <div class="flex items-center gap-4">
@@ -500,17 +576,22 @@
                         <h2 class="text-2xl font-bold text-gray-800 mb-6">设置</h2>
 
                         <!-- Settings Tabs -->
-                        <div class="flex border-b border-gray-100 mb-6">
+                        <div
+                            class="flex border-b border-gray-100 mb-6 overflow-x-auto whitespace-nowrap hide-scrollbar scroll-smooth">
                             <button onclick="switchSettingsTab('system')" id="settings-tab-system"
-                                class="px-6 py-2 text-sm font-medium text-emerald-600 border-b-2 border-emerald-600 transition-colors focus:outline-none">
+                                class="px-6 py-2 text-sm font-medium text-emerald-600 border-b-2 border-emerald-600 transition-colors focus:outline-none flex-shrink-0">
                                 系统 (System)
                             </button>
                             <button onclick="switchSettingsTab('display')" id="settings-tab-display"
-                                class="px-6 py-2 text-sm font-medium text-gray-500 hover:text-emerald-600 border-b-2 border-transparent transition-colors focus:outline-none">
+                                class="px-6 py-2 text-sm font-medium text-gray-500 hover:text-emerald-600 border-b-2 border-transparent transition-colors focus:outline-none flex-shrink-0">
                                 显示 (Display)
                             </button>
+                            <button onclick="switchSettingsTab('logic')" id="settings-tab-logic"
+                                class="px-6 py-2 text-sm font-medium text-gray-500 hover:text-emerald-600 border-b-2 border-transparent transition-colors focus:outline-none flex-shrink-0">
+                                逻辑 (Logic)
+                            </button>
                             <button onclick="switchSettingsTab('logs')" id="settings-tab-logs"
-                                class="px-6 py-2 text-sm font-medium text-gray-500 hover:text-emerald-600 border-b-2 border-transparent transition-colors focus:outline-none">
+                                class="px-6 py-2 text-sm font-medium text-gray-500 hover:text-emerald-600 border-b-2 border-transparent transition-colors focus:outline-none flex-shrink-0">
                                 日志 (Logs)
                             </button>
                         </div>
@@ -526,13 +607,13 @@
 
                                 <!-- 管理入口卡片 -->
                                 <div
-                                    class="flex items-center justify-between bg-emerald-50 p-4 rounded-xl mb-4 border border-emerald-100">
-                                    <div>
+                                    class="flex flex-wrap items-center justify-between gap-4 bg-emerald-50 p-4 rounded-xl mb-4 border border-emerald-100">
+                                    <div class="flex-1 min-w-[200px]">
                                         <div class="font-bold text-emerald-800">自定义源管理(Custom Source Management)</div>
                                         <div class="text-xs text-emerald-600 mt-1">支持上传 .js 脚本扩展音源</div>
                                     </div>
                                     <button onclick="openCustomSourceModal()"
-                                        class="px-4 py-2 bg-white text-emerald-600 font-bold text-sm rounded-lg shadow-sm hover:shadow-md transition-all">
+                                        class="flex-shrink-0 px-4 py-2 bg-white text-emerald-600 font-bold text-sm rounded-lg shadow-sm hover:shadow-md transition-all">
                                         管理 / 添加
                                     </button>
                                 </div>
@@ -667,6 +748,27 @@
 
                                 <div id="sync-status" class="mt-3 text-sm text-gray-500 flex items-center gap-2">
                                     <i class="fas fa-circle text-[8px] text-gray-300"></i> 状态: 未连接
+                                </div>
+                            </div>
+
+                            <!-- Cache & Reset -->
+                            <div class="pt-6 border-t border-gray-100 mb-2">
+                                <h3 class="font-medium text-emerald-600 mb-3">本地缓存与重置 (Cache & Reset)</h3>
+                                <div class="bg-gray-50 p-4 rounded-xl border border-gray-100 flex flex-col gap-3">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex flex-col">
+                                            <span class="text-sm font-bold text-gray-700">浏览器存储占用</span>
+                                            <span class="text-xs text-gray-400">当前 localStorage 已使用空间</span>
+                                        </div>
+                                        <span id="storage-usage-info"
+                                            class="text-sm font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">0
+                                            KB</span>
+                                    </div>
+                                    <button onclick="resetAllSettings()"
+                                        class="w-full py-2.5 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white font-bold rounded-lg transition-all duration-300 border border-red-100 flex items-center justify-center gap-2">
+                                        <i class="fas fa-undo-alt"></i>
+                                        重置所有设置为默认 (Reset Settings)
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -859,20 +961,75 @@
                             </div>
                         </div>
 
+                        <!-- Logic Settings Panel -->
+                        <div id="settings-panel-logic" class="hidden space-y-6 animate-fade-in">
+                            <div>
+                                <h3 class="font-bold text-gray-800 text-lg mb-4 flex items-center">
+                                    <i class="fas fa-microchip mr-2 text-emerald-500"></i> 播放逻辑 (Playback Logic)
+                                </h3>
+                                <!-- Change Playlist on Search Play -->
+                                <div
+                                    class="bg-white rounded-xl border border-gray-100 p-4 hover:shadow-sm transition-shadow">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <h4 class="text-sm font-bold text-gray-800">播放搜索歌曲时切换歌单 (Switch Play
+                                                Context)</h4>
+                                            <p class="text-xs text-gray-400 mt-1">
+                                                开启：播放搜索出的歌曲后，播放列表切换为搜索结果。<br>
+                                                关闭：播放搜索出的歌曲后，播放列表切换为默认列表。<br>
+                                                <span class="text-emerald-500 select-none font-medium">*
+                                                    提示：所有搜索到的歌曲播放时都会自动加入默认列表</span>
+                                            </p>
+                                        </div>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" id="setting-switch-playlist-search"
+                                                class="sr-only peer"
+                                                onchange="updateSetting('switchPlaylistOnSearchPlay', this.checked)">
+                                            <div
+                                                class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500">
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <!-- Auto Resume -->
+                                <div
+                                    class="bg-white rounded-xl border border-gray-100 p-4 hover:shadow-sm transition-shadow">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <h4 class="text-sm font-bold text-gray-800">自动恢复进度 (Auto-Resume)</h4>
+                                            <p class="text-xs text-gray-400 mt-1">
+                                                自动恢复最后播放的歌曲、进度及列表。<br>
+                                                <span class="text-emerald-500 select-none font-medium">*
+                                                    提示：会自动跳转到上次对应的歌单选项卡</span>
+                                            </p>
+                                        </div>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" id="setting-auto-resume" class="sr-only peer"
+                                                onchange="updateSetting('autoResume', this.checked)">
+                                            <div
+                                                class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500">
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Logs Settings Panel -->
                         <div id="settings-panel-logs" class="hidden space-y-6 animate-fade-in h-96 flex flex-col">
-                            <div class="flex items-center justify-between mb-2">
+                            <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
                                 <h3 class="font-bold text-gray-800 text-lg flex items-center">
                                     <i class="fas fa-terminal mr-2 text-emerald-500"></i> 系统日志 (System Logs)
                                 </h3>
-                                <div class="flex gap-2">
+                                <div class="flex gap-2 flex-shrink-0">
                                     <button onclick="window.clearSystemLogs && window.clearSystemLogs()"
-                                        class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs transition-colors"
+                                        class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs transition-colors whitespace-nowrap"
                                         title="清空日志">
                                         <i class="fas fa-trash-alt mr-1"></i>清空
                                     </button>
                                     <button onclick="window.renderSystemLogs && window.renderSystemLogs()"
-                                        class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-lg text-xs transition-colors"
+                                        class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-lg text-xs transition-colors whitespace-nowrap"
                                         title="刷新">
                                         <i class="fas fa-sync-alt mr-1"></i>刷新
                                     </button>
@@ -902,6 +1059,16 @@
                             <div class="h-4 bg-gray-200 rounded w-full mb-2"></div>
                             <div class="h-4 bg-gray-200 rounded w-full mb-2"></div>
                             <div class="h-4 bg-gray-200 rounded w-2/3"></div>
+                        </div>
+
+                        <!-- Check for Updates Button -->
+                        <div class="mt-8 pt-8 border-t border-gray-100 flex flex-col items-center gap-4">
+                            <button onclick="checkForUpdates()"
+                                class="flex items-center gap-2 px-8 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl shadow-lg shadow-emerald-100 transition-all hover:scale-105 active:scale-95 text-sm font-bold group">
+                                <i class="fas fa-sync-alt group-hover:rotate-180 transition-transform duration-500"></i>
+                                检查版本更新
+                            </button>
+                            <p class="text-xs text-gray-400">点击通过云端检查是否有新版本可用</p>
                         </div>
                     </div>
                 </div>
@@ -1086,6 +1253,40 @@
                 </button>
                 <button class="text-gray-600 hover:text-emerald-600 text-lg transition-colors p-2"
                     onclick="playNext()"><i class="fas fa-step-forward"></i></button>
+
+                <!-- Playback Rate Button -->
+                <div class="relative group">
+                    <button id="playback-rate-btn" onclick="togglePlaybackRateMenu(event)"
+                        class="text-gray-400 hover:text-emerald-500 transition-colors p-2 text-[10px] md:text-sm font-black w-10 md:w-12"
+                        title="播放速度">
+                        1.0x
+                    </button>
+                    <!-- Speed Menu -->
+                    <div id="playback-rate-menu"
+                        class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 bg-white rounded-lg shadow-xl border border-gray-200 py-2 w-20 md:w-24 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                        <div
+                            class="text-[10px] font-bold text-gray-400 px-3 py-1 uppercase tracking-wider text-center border-b border-gray-50 mb-1">
+                            倍速</div>
+                        <button onclick="setPlaybackRate(0.5)"
+                            class="playback-rate-option w-full px-3 py-1.5 text-center hover:bg-emerald-50 text-xs md:text-sm transition-colors"
+                            data-rate="0.5">0.5x</button>
+                        <button onclick="setPlaybackRate(0.75)"
+                            class="playback-rate-option w-full px-3 py-1.5 text-center hover:bg-emerald-50 text-xs md:text-sm transition-colors"
+                            data-rate="0.75">0.75x</button>
+                        <button onclick="setPlaybackRate(1.0)"
+                            class="playback-rate-option w-full px-3 py-1.5 text-center hover:bg-emerald-50 text-xs md:text-sm transition-colors font-bold text-emerald-600"
+                            data-rate="1.0">1.0x</button>
+                        <button onclick="setPlaybackRate(1.25)"
+                            class="playback-rate-option w-full px-3 py-1.5 text-center hover:bg-emerald-50 text-xs md:text-sm transition-colors"
+                            data-rate="1.25">1.25x</button>
+                        <button onclick="setPlaybackRate(1.5)"
+                            class="playback-rate-option w-full px-3 py-1.5 text-center hover:bg-emerald-50 text-xs md:text-sm transition-colors"
+                            data-rate="1.5">1.5x</button>
+                        <button onclick="setPlaybackRate(2.0)"
+                            class="playback-rate-option w-full px-3 py-1.5 text-center hover:bg-emerald-50 text-xs md:text-sm transition-colors"
+                            data-rate="2.0">2.0x</button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -1256,11 +1457,64 @@
                     <!-- Playlists will be injected here as buttons -->
                 </div>
 
-                <!-- Create New List Button (Bottom of Grid) -->
-                <button onclick="handleCreateList()"
-                    class="mt-4 w-full py-3 border-2 border-dashed border-red-200 rounded-lg text-red-400 hover:text-red-500 hover:bg-red-50 transition-colors flex items-center justify-center text-xl font-bold">
-                    <i class="fas fa-plus"></i>
-                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sleep Timer Modal -->
+    <div id="sleep-timer-modal"
+        class="fixed inset-0 bg-black/40 z-[60] hidden items-center justify-center backdrop-blur-sm transition-opacity duration-300">
+        <div class="bg-white/90 backdrop-blur-xl rounded-3xl w-full max-w-sm flex flex-col shadow-2xl border border-white/20 transform transition-all duration-300 scale-95 opacity-0"
+            id="sleep-timer-modal-content">
+            <div class="p-6">
+                <!-- Header -->
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-black text-gray-800 flex items-center gap-2">
+                        <i class="fas fa-moon text-emerald-500"></i>
+                        睡眠定时
+                    </h3>
+                    <button onclick="closeSleepTimerModal()"
+                        class="text-gray-400 hover:text-gray-600 p-2 transition-colors">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                <!-- Active Timer Status -->
+                <div id="active-timer-status"
+                    class="hidden mb-6 p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex items-center justify-between">
+                    <div>
+                        <div class="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">倒计时中</div>
+                        <div id="status-countdown" class="text-2xl font-black text-emerald-700 font-mono">30:00</div>
+                    </div>
+                    <button onclick="cancelSleepTimer()"
+                        class="px-4 py-2 bg-white text-red-500 text-xs font-bold rounded-xl shadow-sm hover:shadow-md transition-all">停止</button>
+                </div>
+
+                <!-- Presets -->
+                <div class="grid grid-cols-3 gap-3 mb-6">
+                    <button onclick="setSleepTimer(15)" class="timer-preset-btn">15m</button>
+                    <button onclick="setSleepTimer(30)" class="timer-preset-btn">30m</button>
+                    <button onclick="setSleepTimer(45)" class="timer-preset-btn">45m</button>
+                    <button onclick="setSleepTimer(60)" class="timer-preset-btn">60m</button>
+                    <button onclick="setSleepTimer(90)" class="timer-preset-btn">90m</button>
+                    <button onclick="showCustomTimerInput()" class="timer-preset-btn">自定义</button>
+                </div>
+
+                <!-- Custom Input (Hidden) -->
+                <div id="custom-timer-input" class="hidden mb-6 animate-fade-in">
+                    <div class="flex items-center gap-2">
+                        <input type="number" id="custom-minutes" placeholder="分钟" min="1" max="1440"
+                            class="flex-1 px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-bold text-sm">
+                        <button onclick="applyCustomTimer()"
+                            class="px-5 py-3 bg-emerald-500 text-white font-bold rounded-xl shadow-lg shadow-emerald-100 text-sm hover:bg-emerald-600 transition-all">确定</button>
+                    </div>
+                </div>
+
+                <!-- Footer Hint -->
+                <p class="text-[10px] text-gray-400 text-center leading-relaxed px-4">
+                    倒计时结束后将自动停止当前正在播放的音乐。<br>
+                    祝您好梦 🌙
+                </p>
             </div>
         </div>
     </div>

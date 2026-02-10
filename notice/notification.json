@@ -1,6 +1,6 @@
 [
     {
-        "comment": "=== 欢迎标语 (只显示一次) ===",
+        "comment": "=== 欢迎标语 ===",
         "id": "welcome_slogan_v1",
         "status": "active",
         "type": "broadcast",
@@ -18,24 +18,25 @@
         }
     },
     {
-        "comment": "=== 版本更新 v1.2.4 ===",
-        "id": "update_v1_2_4",
+        "comment": "=== 版本更新 v1.3.0 ===",
+        "id": "update_v1_3_0",
         "status": "active",
         "type": "version",
         "logic": {
-            "target_version": "v1.2.4",
+            "target_version": "v1.3.0",
             "operator": "<",
             "interval_hours": 24
         },
         "ui": {
-            "title": "发现新版本 v1.2.4",
-            "message": "本次更新包含以下内容：\n1. 新增Log显示Tab，方便查看系统日志\n2. 修复自定义源同步后的加载问题\n3. 修复收藏列表显示不全的问题\n建议您尽快更新。",
-            "confirm_text": "去更新",
+            "title": "发现新版本 v1.3.0",
+            "date": "2026-02-10",
+            "message": "本次更新包含重大功能提升：\n1. 新增睡眠定时与播放倍数功能\n2. 新增“逻辑”设置页签，支持自动恢复进度\n3. 优化进度条/音量条拖拽体验，极其丝滑\n4. 新增本地缓存统计与一键重置功能\n5. 修复搜索结果丢失与移动端样式问题",
+            "confirm_text": "去查看",
             "cancel_text": "稍后提醒"
         },
         "action": {
             "type": "link",
-            "url": "https://github.com/XCQ0607/lxserver/releases/tag/v1.2.4"
+            "url": "https://github.com/XCQ0607/lxserver/releases/tag/v1.3.0"
         }
     }
 ]

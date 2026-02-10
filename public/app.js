@@ -317,6 +317,14 @@ class App {
         }
     }
 
+    checkForUpdates() {
+        if (window.LxNotification && window.LxNotification.checkUpdates) {
+            window.LxNotification.checkUpdates(true);
+        } else {
+            alert('通知服务未就绪，请稍后重试');
+        }
+    }
+
     initVersion() {
         if (window.CONFIG && window.CONFIG.version) {
             const versionEl = document.getElementById('console-version');

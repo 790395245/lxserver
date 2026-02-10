@@ -232,6 +232,42 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
       return
     }
 
+    // 动态 config.js - 从静态文件读取版本号, 合并服务端配置注入 window.CONFIG
+    // 配置优先级: 环境变量 > 根目录 config.js > src/defaultConfig.ts
+    if (pathname === '/js/config.js') {
+      // 从静态文件读取版本号
+      const staticConfigPath = path.join(global.lx.staticPath, 'js', 'config.js')
+      let version = 'v1.0.0'
+      try {
+        const content = fs.readFileSync(staticConfigPath, 'utf-8')
+        const match = content.match(/version:\s*['"]([^'"]+)['"]/)
+        if (match) version = match[1]
+      } catch { }
+
+      // 构造前端配置 (不含敏感字段如密码)
+      const frontendConfig = {
+        version,
+        serverName: global.lx.config.serverName,
+        disableTelemetry: global.lx.config.disableTelemetry || false,
+        'proxy.enabled': global.lx.config['proxy.enabled'],
+        'user.enablePath': global.lx.config['user.enablePath'],
+        'user.enableRoot': global.lx.config['user.enableRoot'],
+        maxSnapshotNum: global.lx.config.maxSnapshotNum,
+        'list.addMusicLocationType': global.lx.config['list.addMusicLocationType'],
+        'player.enableAuth': global.lx.config['player.enableAuth'] || false,
+        port: global.lx.config.port,
+        bindIP: global.lx.config.bindIP,
+      }
+
+      const configJs = `window.CONFIG = ${JSON.stringify(frontendConfig, null, 2)};`
+      res.writeHead(200, {
+        'Content-Type': 'application/javascript; charset=utf-8',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+      })
+      res.end(configJs)
+      return
+    }
+
     if (pathname.startsWith('/api/')) {
 
 

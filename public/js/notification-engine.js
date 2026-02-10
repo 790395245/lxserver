@@ -152,6 +152,7 @@
                 </div>
                 
                 <h3 style="margin:0 0 10px; color:var(--c-900, #111827); font-size:20px; font-weight:700; letter-spacing: -0.5px;">${title}</h3>
+                ${item.ui.date ? `<p style="margin:0 0 8px; color:var(--c-500, #9ca3af); font-size:12px;">更新日期: ${item.ui.date}</p>` : ''}
                 <p style="margin:0; color:var(--c-600, #6b7280); font-size:15px; line-height:1.6;">${message.replace(/\n/g, '<br/>')}</p>
             </div>
 
@@ -226,66 +227,123 @@
     }
 
     // ================= 3. 核心逻辑处理 =================
-    function processItem(item) {
-        if (!item || item.status !== 'active') return;
+    function processItem(item, isManual = false) {
+        if (!item || item.status !== 'active') return false;
+
+        // Manual check: ONLY allow 'version' type notifications
+        if (isManual && item.type !== 'version') return false;
 
         const currentVer = CONFIG.getLocalVersion();
         const storageKey = `ph_notif_${item.id}`;
         const lastSeen = localStorage.getItem(storageKey);
 
-        if (lastSeen) {
+        // 如果是手动检查，忽略时间间隔限制
+        if (!isManual && lastSeen) {
             const interval = item.logic.interval_hours;
-            if (interval === -1) return;
+            if (interval === -1) return false;
             const hoursPassed = (Date.now() - parseInt(lastSeen)) / (1000 * 60 * 60);
-            if (hoursPassed < interval) return;
+            if (hoursPassed < interval) return false;
         }
 
         if (item.type === 'version') {
             const target = item.logic.target_version;
+            // 如果是手动检查，且已经是最新版，返回 false
             if (item.logic.operator === '<' && compareVersions(currentVer, target) >= 0) {
-                return;
+                return false;
             }
         }
 
         NOTIFICATION_QUEUE.push({ item, storageKey });
         processQueue();
+        return true;
     }
 
     // ================= 4. 数据获取与处理 =================
-    async function handlePayload(payload, sourceKey) {
-        if (!payload) return;
+    async function handlePayload(payload, sourceKey, isManual = false) {
+        if (!payload) return false;
+        let hasUpdate = false;
         try {
             if (typeof payload === 'object' && payload.url && typeof payload.url === 'string') {
-                await fetchRemoteConfig(payload.url);
-                return;
+                await fetchRemoteConfig(payload.url, isManual);
+                return; // fetchRemoteConfig 会处理结果，这里不好直接返回 hasUpdate，简化处理
             }
             if (typeof payload === 'string' && payload.startsWith('http')) {
-                await fetchRemoteConfig(payload);
+                await fetchRemoteConfig(payload, isManual);
                 return;
             }
             const data = (typeof payload === 'string') ? JSON.parse(payload) : payload;
             if (Array.isArray(data)) {
-                data.forEach(item => processItem(item));
+                data.forEach(item => {
+                    if (processItem(item, isManual)) hasUpdate = true;
+                });
             } else {
-                processItem(data);
+                if (processItem(data, isManual)) hasUpdate = true;
             }
         } catch (e) {
             console.error(`[Notification] Error processing payload from ${sourceKey}:`, e);
         }
+        return hasUpdate;
     }
 
-    async function fetchRemoteConfig(url) {
+    async function fetchRemoteConfig(url, isManual = false) {
         try {
             const bustUrl = url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
             const res = await fetch(bustUrl);
             if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
             const data = await res.json();
+            let hasUpdate = false;
             if (Array.isArray(data)) {
-                data.forEach(item => processItem(item));
+                data.forEach(item => {
+                    if (processItem(item, isManual)) hasUpdate = true;
+                });
             } else {
-                processItem(data);
+                if (processItem(data, isManual)) hasUpdate = true;
             }
-        } catch (e) { console.error(e); }
+
+            if (isManual && !hasUpdate) {
+                // Construct a temporary item for "Up to date"
+                const upToDateItem = {
+                    id: 'manual_check_uptodate',
+                    type: 'info', // Will use Success/Check icon based on title match in getStyleConfig
+                    ui: {
+                        title: '当前已是最新版本',
+                        message: '您的 LX Music Server 已更新到最新版本，无需更新。',
+                        confirm_text: '确定',
+                        cancel_text: ''
+                    },
+                    action: { type: 'close' },
+                    logic: { interval_hours: 0 }
+                };
+                renderModal(upToDateItem, 'temp_manual_check', null);
+            }
+        } catch (e) {
+            console.error('[Notification] Check failed:', e);
+            if (isManual) {
+                let errorTitle = '检查更新失败';
+                let errorMessage = '无法连接到更新服务器，请检查网络连接或稍后重试。';
+
+                // 更精确的错误提示
+                if (e.message.includes('404')) {
+                    errorMessage = '当前服务器未发现预设的更新通知文件，且在线更新检查功能已关闭。';
+                } else if (!window.CONFIG || window.CONFIG.disableTelemetry) {
+                    errorMessage = '由于你已在设置或环境变量中禁用了「数据收集与统计」，系统无法自动连接到远程更新服务器。请直接前往 GitHub 发布页面下载最新版本。';
+                }
+
+                const errorItem = {
+                    id: 'manual_check_error',
+                    type: 'warning',
+                    ui: {
+                        title: errorTitle,
+                        message: errorMessage,
+                        confirm_text: '确定',
+                        cancel_text: ''
+                    },
+                    action: { type: 'close' },
+                    logic: { interval_hours: 0 }
+                };
+                renderModal(errorItem, 'temp_manual_error', null);
+            }
+        }
     }
 
     // ================= 5. 初始化入口 =================
@@ -300,18 +358,66 @@
         }
 
         posthog.onFeatureFlags(() => {
-            for (const key of CONFIG.PRIORITY_KEYS) {
-                const isEnabled = posthog.isFeatureEnabled(key);
-                if (isEnabled) {
-                    const payload = posthog.getFeatureFlagPayload(key);
-                    if (payload) {
-                        handlePayload(payload, key);
-                        return;
-                    }
-                }
-            }
+            checkUpdates(false);
         });
     }
+
+    function checkUpdates(isManual = false) {
+        // 如果服务没加载，或者配置里明确禁用了，直接弹窗告知原因
+        if (typeof posthog === 'undefined' || (window.CONFIG && window.CONFIG.disableTelemetry)) {
+            if (isManual) {
+                const errorItem = {
+                    id: 'manual_check_disabled',
+                    type: 'warning',
+                    ui: {
+                        title: '检查更新失败',
+                        message: '由于你已禁用了「数据收集与统计」，在线更新检查服务未加载。请前往 GitHub 检查最新版本。',
+                        confirm_text: '确定',
+                        cancel_text: ''
+                    },
+                    action: { type: 'close' },
+                    logic: { interval_hours: 0 }
+                };
+                renderModal(errorItem, 'temp_manual_disabled', null);
+            }
+            return;
+        }
+
+        let checked = false;
+        for (const key of CONFIG.PRIORITY_KEYS) {
+            const isEnabled = posthog.isFeatureEnabled(key);
+            if (isEnabled) {
+                const payload = posthog.getFeatureFlagPayload(key);
+                if (payload) {
+                    handlePayload(payload, key, isManual);
+                    checked = true;
+                    return;
+                }
+            }
+        }
+
+        if (isManual && !checked) {
+            // 如果 Feature Flags 里没东西，仅显示“已是最新”即可，不再尝试虚假的本地路径
+            const upToDateItem = {
+                id: 'manual_check_uptodate',
+                type: 'info',
+                ui: {
+                    title: '当前已是最新版本',
+                    message: '未发现可用更新，您的 LX Music Server 运行良好。',
+                    confirm_text: '确定',
+                    cancel_text: ''
+                },
+                action: { type: 'close' },
+                logic: { interval_hours: 0 }
+            };
+            renderModal(upToDateItem, 'temp_manual_check', null);
+        }
+    }
+
+    // 暴露给全局的方法
+    window.LxNotification = {
+        checkUpdates: checkUpdates
+    };
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);

@@ -1,4 +1,4 @@
-# LX Music Sync Server (Enhanced Edition)
+# LX Music Sync Server
 
 <div align="center">
   <img src="/icon.svg" width="100" height="100" alt="LX Sync Logo">
@@ -70,6 +70,7 @@ WEB页端LX的实现参考 [lx-music-desktop](https://github.com/lyswhut/lx-musi
     </svg>
     GitHub 仓库
   </a>
+
 </div>
 
 Copyright © 2026 [xcq0607](https://github.com/xcq0607)

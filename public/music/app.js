@@ -14,6 +14,14 @@
  * limitations under the License.
  */
 
+function checkForUpdates() {
+    if (window.LxNotification && window.LxNotification.checkUpdates) {
+        window.LxNotification.checkUpdates(true);
+    } else {
+        showinfo('通知服务未就绪，请稍后重试');
+    }
+}
+
 const API_BASE = '/api/music';
 let currentPage = 1;
 let currentSearch = { name: '', source: 'kw' };
@@ -22,6 +30,7 @@ let currentIndex = -1;
 let currentSearchScope = 'network'; // 'network', 'local_list', 'local_all'
 let currentPlayingSong = null; // [Fix] Track currently playing song independently of view
 const audio = document.getElementById('audio-player');
+let currentPlaybackRate = 1.0;
 
 // Settings & Batch Selection
 let settings = {
@@ -32,7 +41,9 @@ let settings = {
     enableProxyDownload: false, // 下载音乐代理
     hotSearchLimit: 20, // 热搜显示数量
     lyricFontSize: 1.25, // 歌词字体大小 (rem)
-    lyricFontFamily: '' // 歌词字体
+    lyricFontFamily: '', // 歌词字体
+    switchPlaylistOnSearchPlay: true, // 播放搜索歌曲时切换歌单 (默认开启)
+    autoResume: true // 自动恢复进度 (默认开启)
 };
 
 // 从 localStorage 加载设置
@@ -225,7 +236,85 @@ document.addEventListener('DOMContentLoaded', () => {
             document.documentElement.style.setProperty('--lyric-font-family', fontFamily);
         }
     }
+
+    // Initialize Progress & Volume Dragging
+    const progressContainer = document.getElementById('progress-container');
+    if (progressContainer) {
+        progressContainer.addEventListener('mousedown', (e) => startDragging(e, 'progress'));
+        progressContainer.addEventListener('touchstart', (e) => startDragging(e, 'progress'), { passive: false });
+    }
+
+    const volumeContainer = document.getElementById('volume-container');
+    if (volumeContainer) {
+        volumeContainer.addEventListener('mousedown', (e) => startDragging(e, 'volume'));
+        volumeContainer.addEventListener('touchstart', (e) => startDragging(e, 'volume'), { passive: false });
+    }
+
+    window.addEventListener('mousemove', handleDragMove);
+    window.addEventListener('touchmove', handleDragMove, { passive: false });
+    window.addEventListener('mouseup', stopDragging);
+    window.addEventListener('touchend', stopDragging);
 });
+
+// Dragging Logic
+let isDragging = null; // 'progress' or 'volume'
+let dragPercentage = 0; // Temp value for progress smoothing
+let lastSeekTime = 0; // Throttling for live seeking
+const SEEK_THROTTLE_MS = 100; // How often to update audio position while dragging (ms)
+
+function startDragging(e, type) {
+    if (e.type === 'touchstart') e.preventDefault(); // Prevent scrolling while seeking
+    isDragging = type;
+    handleDragMove(e);
+}
+
+function stopDragging() {
+    if (isDragging === 'progress' && Number.isFinite(dragPercentage)) {
+        audio.currentTime = dragPercentage * audio.duration;
+    }
+    isDragging = null;
+}
+
+function handleDragMove(e) {
+    if (!isDragging) return;
+
+    if (e.type === 'touchmove') e.preventDefault(); // Prevent scrolling
+
+    const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+
+    if (isDragging === 'progress') {
+        const container = document.getElementById('progress-container');
+        if (!container || !audio.duration || !Number.isFinite(audio.duration)) return;
+        const rect = container.getBoundingClientRect();
+        const x = clientX - rect.left;
+        const pct = Math.max(0, Math.min(1, x / rect.width));
+
+        dragPercentage = pct;
+
+        // 1. Update UI immediately (Always smooth)
+        document.getElementById('progress-bar').style.width = `${pct * 100}%`;
+        document.getElementById('time-current').innerText = formatTime(pct * audio.duration);
+
+        // 2. Throttled update of audio position (Live Seeking)
+        const now = Date.now();
+        if (now - lastSeekTime > SEEK_THROTTLE_MS) {
+            audio.currentTime = pct * audio.duration;
+            lastSeekTime = now;
+        }
+    } else if (isDragging === 'volume') {
+        const container = document.getElementById('volume-container');
+        if (!container) return;
+        const rect = container.getBoundingClientRect();
+        const x = clientX - rect.left;
+        const pct = Math.max(0, Math.min(1, x / rect.width));
+        currentVolume = pct;
+        audio.volume = pct;
+        isMuted = false;
+        updateVolumeUI();
+        // Debounce saving if needed, but simple localstorage here
+        localStorage.setItem('lx_volume', currentVolume.toString());
+    }
+}
 
 // 切换代理设置
 function changeProxyPlayback(enabled) {
@@ -402,19 +491,19 @@ function switchTab(tabId) {
         document.getElementById('search-input').placeholder = "搜索歌曲、歌手...";
         document.getElementById('page-title').innerText = "搜索音乐";
 
-        // === 修复：清空搜索结果，显示初始状态 ===
-        const resultsContainer = document.getElementById('search-results');
-        const searchInput = document.getElementById('search-input');
+        // === 清空搜索结果，显示初始状态 ===
+        // const resultsContainer = document.getElementById('search-results');
+        // const searchInput = document.getElementById('search-input');
 
-        currentPlaylist = [];
+        // currentPlaylist = [];
 
-        // 清空搜索框
-        if (searchInput) {
-            searchInput.value = '';
-        }
+        // // 清空搜索框
+        // if (searchInput) {
+        //     searchInput.value = '';
+        // }
 
-        // 总是显示热搜初始状态
-        showInitialSearchState();
+        // // 总是显示热搜初始状态
+        // showInitialSearchState();
     }
 
     // Collapse Favorites if leaving
@@ -521,7 +610,10 @@ async function doSearch(page = 1) {
 
     // Network Search Logic
     const source = document.getElementById('search-source').value;
-    if (!input) return;
+    if (!input) {
+        showInitialSearchState();
+        return;
+    }
 
     currentSearch = { name: input, source };
     currentPage = page;
@@ -1046,7 +1138,7 @@ let currentLoadingSongId = null; // Track currently loading song
 let currentQuality = null; // 当前播放音质 (从 settings.preferredQuality 动态获取)
 let hintTimeout = null;
 
-async function playSong(song, index, forceQuality = null) {
+async function playSong(song, index, forceQuality = null, noPlay = false) {
     // 1. Debounce / Lock: If already loading this song, ignore click
     if (currentLoadingSongId === song.id) {
         console.log(`[Player] Already loading ${song.name}, ignoring request.`);
@@ -1152,6 +1244,21 @@ async function playSong(song, index, forceQuality = null) {
 
             audio.src = finalUrl;
 
+            // 如果是静默加载（用于恢复进度）
+            if (noPlay) {
+                currentQuality = result.type || quality;
+                setPlayerStatus(`暂停中 (${window.QualityManager.getQualityDisplayName(currentQuality)})`);
+                updatePlayButton(false);
+                // 加载元数据后尝试恢复进度
+                if (window._resumeInfo && window._resumeInfo.time > 0) {
+                    audio.addEventListener('loadedmetadata', () => {
+                        audio.currentTime = window._resumeInfo.time;
+                        delete window._resumeInfo;
+                    }, { once: true });
+                }
+                return;
+            }
+
             // 尝试播放
             try {
                 await audio.play();
@@ -1164,6 +1271,15 @@ async function playSong(song, index, forceQuality = null) {
                 // 只有在搜索列表中播放时才添加到默认列表 (试听列表)
                 if (currentSearchScope === 'network') {
                     addToDefaultList(song);
+
+                    // [播放逻辑] 如果设置了不切换歌单，则将当前播放上下文切换到默认列表
+                    if (!settings.switchPlaylistOnSearchPlay && typeof currentListData !== 'undefined' && currentListData.defaultList) {
+                        currentPlaylist = currentListData.defaultList;
+                        currentIndex = 0; // unshift 到了第一位
+                        currentSearchScope = 'local_list';
+                        window.currentViewingListId = 'default';
+                        console.log('[Logic] 已切换播放上下文到默认列表 (Stay in Default List)');
+                    }
                 }
 
                 console.log(`[Player] 播放成功: ${result.url.substring(0, 50)}...`);
@@ -1478,6 +1594,8 @@ function playPrev() {
 
 // Audio Events
 audio.addEventListener('timeupdate', () => {
+    if (isDragging === 'progress') return; // Skip updating UI while user is dragging
+
     const current = audio.currentTime;
     const duration = audio.duration;
 
@@ -1486,10 +1604,20 @@ audio.addEventListener('timeupdate', () => {
 
     const pct = (current / duration) * 100;
     document.getElementById('progress-bar').style.width = `${pct}%`;
+
+    // 自动恢复：保存播放进度 (节流)
+    const now = Date.now();
+    if (settings.autoResume && (!window._lastStateSave || now - window._lastStateSave > 5000)) {
+        savePlaybackState();
+        window._lastStateSave = now;
+    }
 });
 
 // Update Media Session State on Play/Pause
 audio.addEventListener('play', () => {
+    // 确保播放时应用设置的倍速
+    audio.playbackRate = currentPlaybackRate;
+
     if ('mediaSession' in navigator) {
         navigator.mediaSession.playbackState = 'playing';
         updatePositionState();
@@ -1517,7 +1645,122 @@ audio.addEventListener('pause', () => {
     if (lyricPlayer) {
         lyricPlayer.pause();
     }
+    if (settings.autoResume) savePlaybackState();
 });
+
+// ========================================
+// Auto-Resume State Logic
+// ========================================
+
+function savePlaybackState() {
+    if (!currentPlayingSong) return;
+    try {
+        const state = {
+            song: currentPlayingSong,
+            index: currentIndex,
+            time: audio.currentTime,
+            scope: currentSearchScope,
+            listId: window.currentViewingListId,
+            // 只有是搜索结果时才保存整个列表副本，否则保存 ID 即可
+            playlist: (currentSearchScope === 'network') ? currentPlaylist.slice(0, 100) : null,
+            playMode: playMode,
+            timestamp: Date.now()
+        };
+        localStorage.setItem('lx_playback_state', JSON.stringify(state));
+    } catch (e) {
+        console.error('[Resume] 无法保存播放状态:', e);
+    }
+}
+
+async function restorePlaybackState() {
+    if (!settings.autoResume) return;
+
+    try {
+        const saved = localStorage.getItem('lx_playback_state');
+        if (!saved) return;
+
+        const state = JSON.parse(saved);
+        if (!state || !state.song) return;
+
+        console.log('[Resume] 正在恢复上次播放进度:', state.song.name);
+
+        // 1. 恢复播放模式
+        if (state.playMode) {
+            playMode = state.playMode;
+            updatePlayModeUI();
+        }
+
+        // 2. 恢复播放列表和上下文
+        if (state.scope === 'network' && state.playlist) {
+            currentPlaylist = state.playlist;
+            currentSearchScope = 'network';
+        } else if (state.scope === 'local_list' || state.scope === 'local_all') {
+            // 如果是本地列表，数据加载逻辑在 user_sync 之后，这里先记录上下文
+            currentSearchScope = state.scope;
+            window.currentViewingListId = state.listId || 'default';
+        }
+
+        currentIndex = state.index >= 0 ? state.index : 0;
+        currentPlayingSong = state.song;
+
+        // 3. 更新 UI (静默更新)
+        updatePlayerInfo(state.song);
+        updateMediaSessionMetadata(state.song);
+
+        // 4. 跳转到保存的时间点
+        const resumeTime = state.time || 0;
+        window._resumeInfo = {
+            time: resumeTime,
+            song: state.song
+        };
+
+        // 5. 延迟加载播放源（静默模式）
+        setTimeout(() => {
+            // 如果上下文是搜索结果，确保 UI 正确
+            if (state.scope === 'network' && state.playlist) {
+                switchTab('search');
+                // 渲染恢复的列表副本
+                renderResults(state.playlist);
+            } else if (state.scope === 'local_list' || state.scope === 'local_all') {
+                switchTab('favorites');
+                // 本地列表的真实恢复会发生在 renderMyLists 中
+                window._pendingResumeListId = state.listId || 'default';
+            }
+
+            // 加载歌曲 URL
+            playSong(state.song, currentIndex, null, true);
+        }, 800);
+
+    } catch (e) {
+        console.error('[Resume] 恢复播放状态失败:', e);
+    }
+}
+
+// 辅助函数：根据 ID 查找列表内容
+function findListById(data, id) {
+    if (!data) return null;
+    if (id === 'default') return data.defaultList;
+    if (id === 'love') return data.loveList;
+    const ul = data.userList.find(l => l.id === id);
+    return ul ? ul.list : null;
+}
+
+// 辅助函数：获取所有歌曲（我的收藏）
+function getAllSongs(data) {
+    if (!data) return [];
+    let all = [...data.defaultList, ...data.loveList];
+    data.userList.forEach(l => {
+        all = all.concat(l.list);
+    });
+    // 去重
+    const seen = new Set();
+    return all.filter(s => {
+        const sid = s.id || s.songmid;
+        if (seen.has(sid)) return false;
+        seen.add(sid);
+        return true;
+    });
+}
 
 function updatePositionState() {
     if ('mediaSession' in navigator && navigator.mediaSession.setPositionState) {
@@ -1741,12 +1984,66 @@ function togglePlayModeMenu(e) {
     }
 }
 
+// 切换播放倍速菜单（适配移动端点击）
+function togglePlaybackRateMenu(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('playback-rate-menu');
+    if (menu) {
+        menu.classList.toggle('force-visible');
+    }
+}
+
+// 设置播放倍速
+function setPlaybackRate(rate) {
+    currentPlaybackRate = parseFloat(rate);
+    audio.playbackRate = currentPlaybackRate;
+    if (lyricPlayer) {
+        lyricPlayer.setPlaybackRate(currentPlaybackRate);
+        // 强制同步当前音频时间，确保位置严格匹配
+        lyricPlayer.play(audio.currentTime * 1000);
+        isUserScrolling = false; // 重置手动滚动模式，进入自动跟随
+        scrollToActiveLine(true); // 立即对齐并滚动到当前行
+    }
+    updatePlaybackRateUI();
+
+    // 关闭菜单
+    const menu = document.getElementById('playback-rate-menu');
+    if (menu) menu.classList.remove('force-visible');
+}
+
+// 更新播放倍速 UI
+function updatePlaybackRateUI() {
+    const btn = document.getElementById('playback-rate-btn');
+    if (btn) {
+        btn.innerText = currentPlaybackRate === 1.0 ? '1.0x' : `${currentPlaybackRate}x`;
+        btn.classList.toggle('text-emerald-500', currentPlaybackRate !== 1.0);
+    }
+
+    const options = document.querySelectorAll('.playback-rate-option');
+    options.forEach(opt => {
+        const rate = parseFloat(opt.dataset.rate);
+        if (rate === currentPlaybackRate) {
+            opt.classList.add('font-bold', 'text-emerald-600');
+        } else {
+            opt.classList.remove('font-bold', 'text-emerald-600');
+        }
+    });
+}
+
 // 监听全局点击，关闭菜单
 document.addEventListener('click', (e) => {
-    const menu = document.getElementById('play-mode-menu');
-    const btn = document.getElementById('play-mode-btn');
-    if (menu && btn && !menu.contains(e.target) && !btn.contains(e.target)) {
-        menu.classList.remove('force-visible');
+    // 关闭播放模式菜单
+    const pmMenu = document.getElementById('play-mode-menu');
+    const pmBtn = document.getElementById('play-mode-btn');
+    if (pmMenu && pmBtn && !pmMenu.contains(e.target) && !pmBtn.contains(e.target)) {
+        pmMenu.classList.remove('force-visible');
+    }
+
+    // 关闭倍速菜单
+    const prMenu = document.getElementById('playback-rate-menu');
+    const prBtn = document.getElementById('playback-rate-btn');
+    if (prMenu && prBtn && !prMenu.contains(e.target) && !prBtn.contains(e.target)) {
+        prMenu.classList.remove('force-visible');
     }
 });
 
@@ -1829,6 +2126,79 @@ function loadSettings() {
     } catch (e) {
         console.error('[Settings] 加载设置失败:', e);
     }
+
+    // 同步 UI 状态
+    syncSettingsUI();
+}
+
+function updateSetting(key, value) {
+    settings[key] = value;
+    try {
+        localStorage.setItem('lx_settings', JSON.stringify(settings));
+        console.log(`[Settings] ${key} 已更新为:`, value);
+    } catch (e) {
+        console.error('[Settings] 保存设置失败:', e);
+    }
+}
+
+function syncSettingsUI() {
+    // 逻辑页签设置
+    const switchSearch = document.getElementById('setting-switch-playlist-search');
+    if (switchSearch) {
+        switchSearch.checked = settings.switchPlaylistOnSearchPlay !== false;
+    }
+
+    const autoResume = document.getElementById('setting-auto-resume');
+    if (autoResume) {
+        autoResume.checked = settings.autoResume !== false;
+    }
+
+    // 其他设置项同步 (如需扩展可以加在这里)
+    const qualitySelect = document.getElementById('quality-select');
+    if (qualitySelect) qualitySelect.value = settings.preferredQuality || '320k';
+
+    const itemsPerPage = document.getElementById('items-per-page-select');
+    if (itemsPerPage) itemsPerPage.value = settings.itemsPerPage || 20;
+
+    // 更新存储统计
+    updateStorageStatsUI();
+}
+
+// ========== 缓存统计与重置逻辑 ==========
+
+function calcStorageUsage() {
+    let total = 0;
+    for (let x in localStorage) {
+        if (!localStorage.hasOwnProperty(x)) continue;
+        const val = localStorage.getItem(x);
+        total += (x.length + val.length) * 2; // UTF-16 characters are 2 bytes
+    }
+    // Convert to readable format
+    if (total < 1024) return total + ' B';
+    if (total < 1024 * 1024) return (total / 1024).toFixed(2) + ' KB';
+    return (total / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
+function updateStorageStatsUI() {
+    const el = document.getElementById('storage-usage-info');
+    if (el) {
+        el.innerText = calcStorageUsage();
+    }
+}
+
+async function resetAllSettings() {
+    const ok = await showSelect('重置所有设置', '确定要重置吗？这不会删除您的歌单，但会恢复音质、列表显示、主题等设置到默认状态。', { danger: true });
+    if (!ok) return;
+    try {
+        localStorage.removeItem('lx_settings');
+        localStorage.removeItem('lx_playback_state'); // 同时重置播放进度记忆
+        showSuccess('设置已重置，正在重新加载页面...');
+        setTimeout(() => {
+            window.location.reload();
+        }, 1500);
+    } catch (e) {
+        showError('重置失败: ' + e.message);
+    }
 }
 
 
@@ -1843,6 +2213,7 @@ window.togglePlay = togglePlay;
 window.playNext = playNext;
 window.changeProxyPlayback = changeProxyPlayback;
 window.changeProxyDownload = changeProxyDownload;
+window.resetAllSettings = resetAllSettings;
 window.playPrev = playPrev;
 window.seek = seek;
 window.changeLyricFontSize = changeLyricFontSize;
@@ -1981,7 +2352,7 @@ async function fetchLyric(song) {
         if (!lyricPlayer) {
             lyricPlayer = new window.LinePlayer({
                 offset: 0,
-                rate: 1,
+                rate: currentPlaybackRate || 1,
                 onPlay: (lineNum, text, curTime) => {
                     syncLyricByLineNum(lineNum);
                 },
@@ -2641,6 +3012,15 @@ function renderMyLists(data) {
             const listLen = l.list ? l.list.length : 0;
             container.appendChild(createItem(l.id, l.name, 'fa-music', listLen));
         });
+    }
+
+    // [Resume] 处理本地列表的自动恢复跳转
+    if (window._pendingResumeListId) {
+        const listId = window._pendingResumeListId;
+        delete window._pendingResumeListId;
+        console.log('[Resume] 正在同步本地播放列表上下文:', listId);
+        // 调用 handleListClick 以加载真实的列表数据并应用高亮
+        handleListClick(listId);
     }
 }
 
@@ -3740,6 +4120,7 @@ window.changeQualityPreference = changeQualityPreference;
 window.setVolume = setVolume;
 window.toggleMute = toggleMute;
 window.setPlayMode = setPlayMode;
+window.showSelect = showSelect;
 
 // Lyrics
 window.toggleLyrics = toggleLyrics;
@@ -3794,6 +4175,69 @@ if (audio) {
 // ========================================
 // UI Helper Functions (Toast Notifications)
 // ========================================
+
+/**
+ * 弹出精美的选择/确认对话框 (showSelect)
+ * @param {string} title 标题
+ * @param {string} message 内容
+ * @param {object} options 配置 (confirmText, cancelText, danger)
+ * @returns {Promise<boolean>}
+ */
+function showSelect(title, message, options = {}) {
+    const {
+        confirmText = '确定',
+        cancelText = '取消',
+        confirmColor = 'bg-emerald-500',
+        danger = false
+    } = options;
+
+    const btnColor = danger ? 'bg-red-500 hover:bg-red-600 shadow-red-100' : `${confirmColor} hover:opacity-90 shadow-emerald-100`;
+
+    return new Promise((resolve) => {
+        const modal = document.createElement('div');
+        modal.className = "fixed inset-0 z-[100] flex items-center justify-center p-4 animate-fade-in";
+        modal.innerHTML = `
+            <div class="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-300"></div>
+            <div class="bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all animate-slide-up relative z-10 border border-white/20">
+                <div class="p-6">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 rounded-full ${danger ? 'bg-red-50 text-red-500' : 'bg-emerald-50 text-emerald-500'} flex items-center justify-center shrink-0">
+                            <i class="fas ${danger ? 'fa-exclamation-triangle' : 'fa-question-circle'} text-lg"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-900">${title}</h3>
+                    </div>
+                    <p class="text-sm text-gray-500 leading-relaxed pl-1">${message}</p>
+                </div>
+                <div class="p-4 bg-gray-50/50 flex gap-3 flex-row-reverse">
+                    <button id="confirm-ok" class="flex-1 py-2.5 text-sm font-bold text-white ${btnColor} rounded-xl shadow-lg transition-all active:scale-95">
+                        ${confirmText}
+                    </button>
+                    <button id="confirm-cancel" class="flex-1 py-2.5 text-sm font-bold text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all">
+                        ${cancelText}
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        const close = (result) => {
+            const content = modal.querySelector('.max-w-sm');
+            if (content) {
+                content.classList.add('scale-95', 'opacity-0');
+            }
+            modal.classList.add('opacity-0');
+            setTimeout(() => {
+                modal.remove();
+                resolve(result);
+            }, 200);
+        };
+
+        modal.querySelector('#confirm-ok').onclick = () => close(true);
+        modal.querySelector('#confirm-cancel').onclick = () => close(false);
+        modal.querySelector('div:first-child').onclick = () => close(false);
+    });
+}
 
 // 通用 Toast 显示函数 (支持宽屏、滚动文字、点击重置倒计时)
 function showToast(type, message, duration = 3000) {
@@ -3875,6 +4319,158 @@ function showSuccess(message) { showToast('success', message, 2000); }
 function showInfo(message) { showToast('info', message, 3000); }
 function showError(message) { showToast('error', message, 4000); }
 
+// ========================================
+// Sleep Timer Logic
+// ========================================
+
+let sleepTimerId = null;
+let sleepTimerEnd = 0;
+
+function openSleepTimerModal() {
+    const modal = document.getElementById('sleep-timer-modal');
+    const content = document.getElementById('sleep-timer-modal-content');
+    if (!modal || !content) return;
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+
+    // Trigger animation
+    requestAnimationFrame(() => {
+        content.classList.remove('scale-95', 'opacity-0');
+        content.classList.add('scale-100', 'opacity-100');
+    });
+
+    updateSleepTimerModalUI();
+}
+
+function closeSleepTimerModal() {
+    const modal = document.getElementById('sleep-timer-modal');
+    const content = document.getElementById('sleep-timer-modal-content');
+    if (!modal || !content) return;
+
+    content.classList.add('scale-95', 'opacity-0');
+    content.classList.remove('scale-100', 'opacity-100');
+
+    setTimeout(() => {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }, 300);
+}
+
+function setSleepTimer(minutes) {
+    cancelSleepTimer();
+    const durationMs = minutes * 60 * 1000;
+    sleepTimerEnd = Date.now() + durationMs;
+
+    startSleepTimerLoop();
+    closeSleepTimerModal();
+    showSuccess(`已设置 ${minutes} 分钟后停止播放`);
+}
+
+function cancelSleepTimer() {
+    if (sleepTimerId) {
+        clearInterval(sleepTimerId);
+        sleepTimerId = null;
+    }
+    sleepTimerEnd = 0;
+
+    const countdown = document.getElementById('sleep-timer-countdown');
+    const triggerIcon = document.querySelector('#sleep-timer-trigger i');
+    const activeStatus = document.getElementById('active-timer-status');
+
+    if (countdown) countdown.classList.add('hidden');
+    if (activeStatus) activeStatus.classList.add('hidden');
+    if (triggerIcon) {
+        triggerIcon.classList.replace('fas', 'far');
+        triggerIcon.classList.remove('text-emerald-500');
+    }
+}
+
+function startSleepTimerLoop() {
+    const countdown = document.getElementById('sleep-timer-countdown');
+    const triggerIcon = document.querySelector('#sleep-timer-trigger i');
+
+    if (countdown) countdown.classList.remove('hidden');
+    if (triggerIcon) {
+        triggerIcon.classList.replace('far', 'fas');
+        triggerIcon.classList.add('text-emerald-500');
+    }
+
+    updateSleepTimerDisplay();
+    sleepTimerId = setInterval(() => {
+        updateSleepTimerDisplay();
+    }, 1000);
+}
+
+function updateSleepTimerDisplay() {
+    const now = Date.now();
+    const remain = sleepTimerEnd - now;
+
+    if (remain <= 0) {
+        finishSleepTimer();
+        return;
+    }
+
+    const minutes = Math.floor(remain / 60000);
+    const seconds = Math.floor((remain % 60000) / 1000);
+    const timeStr = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+    const countdown = document.getElementById('sleep-timer-countdown');
+    const statusCountdown = document.getElementById('status-countdown');
+
+    if (countdown) countdown.innerText = timeStr;
+    if (statusCountdown) statusCountdown.innerText = timeStr;
+}
+
+function finishSleepTimer() {
+    cancelSleepTimer();
+    // Use audio.pause directly or togglePlay if music is active
+    if (audio && !audio.paused) {
+        audio.pause();
+        updatePlayButton(false);
+        showInfo('睡眠时间到，音乐已停止播放 🌙');
+    }
+}
+
+function updateSleepTimerModalUI() {
+    const activeStatus = document.getElementById('active-timer-status');
+    const customInput = document.getElementById('custom-timer-input');
+
+    if (activeStatus) {
+        if (sleepTimerEnd > Date.now()) {
+            activeStatus.classList.remove('hidden');
+        } else {
+            activeStatus.classList.add('hidden');
+        }
+    }
+    if (customInput) customInput.classList.add('hidden');
+}
+
+function showCustomTimerInput() {
+    const input = document.getElementById('custom-timer-input');
+    if (input) input.classList.remove('hidden');
+}
+
+function applyCustomTimer() {
+    const inputEl = document.getElementById('custom-minutes');
+    const val = parseInt(inputEl.value);
+    if (val > 0) {
+        setSleepTimer(val);
+        inputEl.value = '';
+    } else {
+        showError('请输入正确的时间（分钟）');
+    }
+}
+
+// 监听模态框外部点击关闭
+document.addEventListener('mousedown', (e) => {
+    const modal = document.getElementById('sleep-timer-modal');
+    const content = document.getElementById('sleep-timer-modal-content');
+    if (modal && !modal.classList.contains('hidden') && e.target === modal) {
+        closeSleepTimerModal();
+    }
+});
+
 // 监听窗口大小变化
 window.addEventListener('resize', () => {
     const indicator = document.getElementById('lyric-scroll-indicator');
@@ -3928,6 +4524,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 恢复其他设置
     loadSettings();
+    restorePlaybackState();
 
     // 监听源切换，自动刷新热搜
     const searchSourceSelect = document.getElementById('search-source');

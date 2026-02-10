@@ -1,94 +1,9 @@
 # LX Music Web Player
 
-<div align="center">
-  <img src="../public/music/assets/logo.svg" width="120" height="120" alt="LX Music Logo">
-  <br>
-  <h1>LX Music Web</h1>
-  <p>
-    <img src="https://img.shields.io/badge/build-passing-brightgreen?style=flat-square" alt="Build Status">
-    <img src="https://img.shields.io/badge/version-v1.0.0-blue?style=flat-square" alt="Version">
-    <img src="https://img.shields.io/badge/license-Apache%202.0-orange?style=flat-square" alt="License">
-  </p>
-</div>
+The full documentation for the Web Player has been moved to the [main README](../README.md).
 
-LX Music Sync Server 内置了一个功能强大的 Web 播放器，让你可以随时随地在浏览器中享受音乐。
+Please visit the [Project Homepage](../README.md) for features, screenshots, and quick start guide.
 
-![Web Player Interface](player.png)
+---
 
-## ✨ 核心特性
-
-### 1. 现代化界面
-
-采用清爽的现代化 UI 设计，支持深色模式，提供极致的视觉体验。
-
-### 2. 多源搜索
-
-支持聚合搜索各大音乐平台的资源，想听什么搜什么。
-
-![Search Interface](search.png)
-
-### 3. 歌单同步
-
-与 LX Music 客户端数据完美互通，收藏的歌曲瞬间同步到 Web 端。
-
-![Favorite List](favorite.png)
-
-### 4. 强大的播放控制
-
-支持播放模式切换（单曲循环、列表循环、随机播放）、音质选择、歌词显示等功能。
-
-### 5. 自定义源管理
-
-支持导入自定义源脚本，扩展更多音乐来源。
-
-![Source Management](source.png)
-
-## 🔒 访问控制
-
-为了保护你的隐私，Web 播放器支持开启访问密码。
-
-![Auth Check](setting.png)
-
-### 开启方式
-
-1. **环境变量配置**（推荐 Docker 用户使用）：
-
-   - `ENABLE_WEBPLAYER_AUTH=true`: 开启认证
-   - `WEBPLAYER_PASSWORD=yourpassword`: 设置访问密码
-2. **Web 界面配置**：
-   登录管理后台，进入 **"系统配置"**，勾选 **"启用 Web 播放器访问密码"** 并设置密码。
-
-开启后，访问 `/music` 将需要输入密码才能进入播放器界面。
-
-## 📱 移动端适配
-
-Web 播放器针对移动端进行了深度优化，手机浏览器访问也能获得原生 App 般的体验。
-
-## 📜 项目协议
-
-本项目基于 Apache License 2.0 许可证发行，以下协议是对于 Apache License 2.0 的补充，如有冲突，以以下协议为准。
-
-**词语约定**：本协议中的“本项目”指 LX Music Web 播放器；“使用者”指签署本协议的使用者；“官方音乐平台”指对本项目内置的包括酷我、酷狗、咪咕等音乐源的官方平台统称；“版权数据”指包括但不限于图像、音频、名字等在内的他人拥有所属版权的数据。
-
-### 一、数据来源
-1. **官方平台**: 本项目的各官方平台在线数据来源原理是从其公开服务器中拉取数据，经过对数据简单地筛选与合并后进行展示，因此本项目不对数据的合法性、准确性负责。
-2. **音频数据**: 本项目本身没有获取某个音频数据的能力，所使用的在线音频数据来源来自设置内“自定义源”所选择的“源”返回的在线链接。本项目无法校验其准确性，使用过程中可能会出现播放异常。
-3. **其他数据**: 本项目的非官方平台数据（例如“我的列表”内列表）来自服务器存储数据，本项目不对这些数据的合法性、准确性负责。
-
-### 二、免责声明
-1. **版权数据**: 使用本项目的过程中可能会产生版权数据。对于这些版权数据，本项目不拥有它们的所有权。为了避免侵权，使用者务必在 **24 小时内** 清除使用本项目的过程中所产生的版权数据。
-2. **责任承担**: 由于使用本项目产生的包括由于本协议或由于使用或无法使用本项目而引起的任何性质的任何直接、间接、特殊、偶然或结果性损害由使用者负责。
-3. **法律法规**: 本项目完全免费，且开源发布于 GitHub 面向全世界人用作对技术的学习交流。**禁止**在违反当地法律法规的情况下使用本项目。对于使用者在明知或不知当地法律法规不允许的情况下使用本项目所造成的任何违法违规行为由使用者承担。
-
-### 三、其他
-1. **资源使用**: 本项目内使用的部分包括但不限于字体、图片等资源来源于互联网。如果出现侵权可联系本项目移除。
-2. **非商业性质**: 本项目仅用于对技术可行性的探索及研究，不接受任何商业（包括但不限于广告等）合作及捐赠。
-3. **接受协议**: 若你使用了本项目，即代表你接受本协议。
-
-## 🤝 致谢
-
-本项目的 Web 播放器参考了 [lx-music-desktop](https://github.com/lyswhut/lx-music-desktop) 的设计与实现。
-
-感谢 [lyswhut](https://github.com/lyswhut) 开发了如此优秀的开源音乐软件。
-
-核心接口基于 `musicsdk` 实现。
+[Back to Main Page](../README.md)

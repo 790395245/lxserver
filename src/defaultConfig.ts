@@ -33,6 +33,7 @@ const config: LX.Config = {
   // Web播放器配置
   'player.enableAuth': false,
   'player.password': '123456',
+
 }
 
 export default config

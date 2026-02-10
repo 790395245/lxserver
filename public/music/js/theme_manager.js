@@ -40,7 +40,7 @@ function updateThemeSelectionUI(activeTheme) {
 }
 
 function switchSettingsTab(tabName) {
-    const panels = ['system', 'display', 'logs'];
+    const panels = ['system', 'display', 'logic', 'logs'];
 
     // Deactivate all first
     panels.forEach(p => {
@@ -66,6 +66,9 @@ function switchSettingsTab(tabName) {
     if (activeTab) {
         activeTab.classList.add('text-emerald-600', 'border-emerald-600');
         activeTab.classList.remove('text-gray-500', 'border-transparent', 'hover:text-emerald-600');
+
+        // Scroll to the active tab to make sure it's visible (for mobile)
+        activeTab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
     }
 
     // Special logic for logs
