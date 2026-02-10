@@ -21,45 +21,54 @@
 ## ✨ Web 播放器核心特性
 
 ### 1. 现代化界面
-
 采用清爽的现代化 UI 设计，支持深色模式，提供极致的视觉体验。
-![Web Player Interface](md/player.png)
+<p align="center">
+  <img src="md/player.png" width="800" alt="Web Player Interface">
+</p>
 
 ### 2. 多源搜索
-
 支持聚合搜索各大音乐平台的资源，想听什么搜什么。
-![Search Interface](md/search.png)
+<p align="center">
+  <img src="md/search.png" width="800" alt="Search Interface">
+</p>
 
 ### 3. 歌单同步
-
 与 LX Music 客户端数据完美互通，收藏的歌曲瞬间同步到 Web 端。
-![aync](md/sync.png)
-![Favorite List](md/favorite.png)
+<p align="center">
+  <img src="md/sync.png" width="400" alt="Sync">
+  <img src="md/favorite.png" width="400" alt="Favorite List">
+</p>
 
-### 4. 强大的播放控制
+### 4. 强大的播放控制与设置
+支持播放模式切换、音质选择、歌词显示、睡眠定时、播放倍数等功能。
+<p align="center">
+  <img src="md/controller.png" width="600" alt="Controller">
+</p>
 
-支持播放模式切换（单曲循环、列表循环、随机播放）、音质选择、歌词显示、睡眠定时、播放倍数等功能。
-![Controller](md/controller.png)
+<div align="center">
+  <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
+    <div style="text-align: center;">
+      <p><b>自定义显示</b></p>
+      <img src="md/display.png" width="380" alt="display">
+    </div>
+    <div style="text-align: center;">
+      <p><b>睡眠定时</b></p>
+      <img src="md/sleep.png" width="380" alt="sleep">
+    </div>
+  </div>
+</div>
 
 ### 5. 自定义源管理
-
 支持导入自定义源脚本，扩展更多音乐来源。
-![Source Management](md/source.png)
-
-### 6. 自定义显示设置
-
-支持歌词显示，支持自定义字体与大小。
-![display](md/display.png)
-
-### 7.睡眠定时
-
-支持设置播放一定时间后自动停止播放
-![sleep](md/sleep.png)
+<p align="center">
+  <img src="md/source.png" width="800" alt="Source Management">
+</p>
 
 ## 🔒 访问控制与安全
-
 为了保护你的隐私，Web 播放器支持开启访问密码。
-![Auth Check](md/setting.png)
+<p align="center">
+  <img src="md/setting.png" width="800" alt="Auth Check">
+</p>
 
 ### 开启方式
 
@@ -91,7 +100,20 @@ docker run -d \
   ghcr.io/xcq0607/lxserver:latest
 ```
 
-#### 方式三：使用 Release 版本
+### 方式二：直接运行 (Git Clone)
+
+```bash
+# 1. 克隆项目
+git clone https://github.com/XCQ0607/lxserver.git && cd lxserver
+
+# 2. 安装依赖并编译
+npm ci && npm run build
+
+# 3. 启动服务
+npm start
+```
+
+### 方式三：使用 Release 版本
 
 1. 在 GitHub Releases 下载压缩包。
 2. 解压后运行 `npm install --production`。
@@ -155,10 +177,6 @@ docker run -d \
 - Web 播放器逻辑参考 [lx-music-desktop](https://github.com/lyswhut/lx-music-desktop)。
 - 接口实现基于 `musicsdk`。
 
-## 📄 开源协议
-
-Apache License 2.0 copyright (c) 2026 [xcq0607](https://github.com/xcq0607)
-
 ## 📈 Star History
 
 <a href="https://star-history.com/#XCQ0607/lxserver&Date">
@@ -168,3 +186,9 @@ Apache License 2.0 copyright (c) 2026 [xcq0607](https://github.com/xcq0607)
     <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=XCQ0607/lxserver&type=Date" />
   </picture>
 </a>
+
+
+## 📄 开源协议
+
+Apache License 2.0 copyright (c) 2026 [xcq0607](https://github.com/xcq0607)
+

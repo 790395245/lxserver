@@ -3438,7 +3438,6 @@ async function handleFileUpload(input) {
 }
 
 // 处理远程链接导入
-// 处理远程链接导入
 async function handleUrlImport() {
     // [Fix] UI does not have an input box, use Prompt
     const input = prompt("请输入自定义源脚本的 URL 地址 (.js):");
@@ -3464,7 +3463,11 @@ async function handleUrlImport() {
         const response = await fetch(`/api/custom-source/import`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url, filename })
+            body: JSON.stringify({
+                url,
+                filename,
+                username: currentListData?.username || 'default'
+            })
         });
 
         if (!response.ok) {
