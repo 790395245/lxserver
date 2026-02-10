@@ -509,6 +509,10 @@
                                 class="px-6 py-2 text-sm font-medium text-gray-500 hover:text-emerald-600 border-b-2 border-transparent transition-colors focus:outline-none">
                                 显示 (Display)
                             </button>
+                            <button onclick="switchSettingsTab('logs')" id="settings-tab-logs"
+                                class="px-6 py-2 text-sm font-medium text-gray-500 hover:text-emerald-600 border-b-2 border-transparent transition-colors focus:outline-none">
+                                日志 (Logs)
+                            </button>
                         </div>
 
                         <!-- System Settings Panel -->
@@ -852,6 +856,38 @@
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+
+                        <!-- Logs Settings Panel -->
+                        <div id="settings-panel-logs" class="hidden space-y-6 animate-fade-in h-96 flex flex-col">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="font-bold text-gray-800 text-lg flex items-center">
+                                    <i class="fas fa-terminal mr-2 text-emerald-500"></i> 系统日志 (System Logs)
+                                </h3>
+                                <div class="flex gap-2">
+                                    <button onclick="window.clearSystemLogs && window.clearSystemLogs()"
+                                        class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs transition-colors"
+                                        title="清空日志">
+                                        <i class="fas fa-trash-alt mr-1"></i>清空
+                                    </button>
+                                    <button onclick="window.renderSystemLogs && window.renderSystemLogs()"
+                                        class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-lg text-xs transition-colors"
+                                        title="刷新">
+                                        <i class="fas fa-sync-alt mr-1"></i>刷新
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div
+                                class="flex-1 bg-gray-900 rounded-xl border border-gray-800 p-4 font-mono text-xs overflow-hidden flex flex-col shadow-inner">
+                                <div id="system-log-container"
+                                    class="flex-1 overflow-y-auto custom-scrollbar space-y-1 bg-gray-900 text-gray-300">
+                                    <div class="text-gray-500 italic text-center py-4">暂无日志...</div>
+                                </div>
+                            </div>
+                            <div class="text-[10px] text-gray-400 text-right">
+                                * 显示系统启动后的 Console 输出
                             </div>
                         </div>
                     </div>
@@ -1232,6 +1268,7 @@
     <!-- Audio Element -->
     <audio id="audio-player"></audio>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+    <script src="/music/js/log_viewer.js"></script>
     <script src="/music/js/lyric-utils.js"></script>
     <script src="/music/js/lyric-parser.js"></script>
     <script src="/music/js/quality.js"></script>

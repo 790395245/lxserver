@@ -39,39 +39,38 @@ function updateThemeSelectionUI(activeTheme) {
     });
 }
 
-// Switch Settings Tabs
 function switchSettingsTab(tabName) {
-    // Panels
-    const systemPanel = document.getElementById('settings-panel-system');
-    const displayPanel = document.getElementById('settings-panel-display');
+    const panels = ['system', 'display', 'logs'];
 
-    // Tabs
-    const systemTab = document.getElementById('settings-tab-system');
-    const displayTab = document.getElementById('settings-tab-display');
+    // Deactivate all first
+    panels.forEach(p => {
+        const panel = document.getElementById(`settings-panel-${p}`);
+        const tab = document.getElementById(`settings-tab-${p}`);
 
-    if (tabName === 'system') {
-        systemPanel.classList.remove('hidden');
-        displayPanel.classList.add('hidden');
+        if (panel) panel.classList.add('hidden');
 
-        // Style Active System Tab
-        systemTab.classList.add('text-emerald-600', 'border-emerald-600');
-        systemTab.classList.remove('text-gray-500', 'border-transparent', 'hover:text-emerald-600');
+        if (tab) {
+            tab.classList.remove('text-emerald-600', 'border-emerald-600');
+            tab.classList.add('text-gray-500', 'border-transparent', 'hover:text-emerald-600');
+        }
+    });
 
-        // Style Inactive Display Tab
-        displayTab.classList.add('text-gray-500', 'border-transparent', 'hover:text-emerald-600');
-        displayTab.classList.remove('text-emerald-600', 'border-emerald-600');
+    // Activate the selected one
+    const activePanel = document.getElementById(`settings-panel-${tabName}`);
+    const activeTab = document.getElementById(`settings-tab-${tabName}`);
 
-    } else if (tabName === 'display') {
-        systemPanel.classList.add('hidden');
-        displayPanel.classList.remove('hidden');
+    if (activePanel) {
+        activePanel.classList.remove('hidden');
+    }
 
-        // Style Active Display Tab
-        displayTab.classList.add('text-emerald-600', 'border-emerald-600');
-        displayTab.classList.remove('text-gray-500', 'border-transparent', 'hover:text-emerald-600');
+    if (activeTab) {
+        activeTab.classList.add('text-emerald-600', 'border-emerald-600');
+        activeTab.classList.remove('text-gray-500', 'border-transparent', 'hover:text-emerald-600');
+    }
 
-        // Style Inactive System Tab
-        systemTab.classList.add('text-gray-500', 'border-transparent', 'hover:text-emerald-600');
-        systemTab.classList.remove('text-emerald-600', 'border-emerald-600');
+    // Special logic for logs
+    if (tabName === 'logs' && window.renderSystemLogs) {
+        window.renderSystemLogs();
     }
 }
 

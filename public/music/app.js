@@ -2647,6 +2647,15 @@ function renderMyLists(data) {
 function handleListClick(listId) {
     if (!currentListData) return;
 
+    // Mobile: Close sidebar when a list is selected
+    if (window.innerWidth < 768) {
+        const sidebar = document.getElementById('main-sidebar');
+        // If sidebar is open (class removed), close it
+        if (sidebar && !sidebar.classList.contains('-translate-x-full')) {
+            toggleSidebar();
+        }
+    }
+
     // Set current viewing list ID for batch operations
     window.currentViewingListId = listId;
     currentSearchScope = 'local_list';
@@ -2706,8 +2715,7 @@ function handleFavoritesClick() {
     document.querySelectorAll('[id^="tab-"]').forEach(el => el.classList.remove('active-tab', 'text-emerald-600'));
     const favTab = document.getElementById('tab-favorites');
     if (favTab) {
-        favTab.classList.add('active-tab'); // Styling
-        // favTab inner content text color? The class `active-tab` has color.
+        favTab.classList.add('active-tab');
     }
 
     // UI Updates
@@ -2719,14 +2727,32 @@ function handleFavoritesClick() {
     // Set Scope
     currentSearchScope = 'local_all';
 
-    // Initial Render: Show Love List + Default List?
-    // Or just show nice empty state "Search to find in all collections"
-    // Let's show Love List as a default view for "Overview"
+    // Collect all songs from Default, Love, and User Lists
+    let allSongs = [];
     if (currentListData) {
-        renderResults(currentListData.loveList || []);
-    } else {
-        renderResults([]);
+        if (currentListData.defaultList) allSongs = allSongs.concat(currentListData.defaultList);
+        if (currentListData.loveList) allSongs = allSongs.concat(currentListData.loveList);
+        if (currentListData.userList) {
+            currentListData.userList.forEach(l => {
+                if (l.list) allSongs = allSongs.concat(l.list);
+            });
+        }
     }
+
+    // Deduplicate by song ID
+    const uniqueSongs = [];
+    const seenIds = new Set();
+    allSongs.forEach(s => {
+        if (s && s.id && !seenIds.has(s.id)) {
+            seenIds.add(s.id);
+            uniqueSongs.push(s);
+        }
+    });
+
+    // Update global playlist and render
+    currentPlaylist = uniqueSongs;
+    currentPage = 1;
+    renderResults(uniqueSongs);
 }
 
 function handleCreateList() {
@@ -3251,7 +3277,6 @@ async function renderCustomSources() {
                             ${createMarqueeHtml(source.name, "font-bold text-gray-800 text-sm")}
                         </div>
                         <div class="flex items-center gap-2">
-                             <span class="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded shrink-0">v${source.version}</span>
                              ${statusBadge}
                         </div>
                     </div>
@@ -3259,6 +3284,7 @@ async function renderCustomSources() {
                     <div class="flex items-center text-[10px] text-gray-400 space-x-2 mt-1">
                         <span><i class="fas fa-user mr-1"></i>${source.author || '未知'}</span>
                         <span class="hidden sm:inline"><i class="far fa-hdd mr-1"></i>${size}</span>
+                        <span class="bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded shrink-0">v${source.version}</span>
                     </div>
                     ${supportedBadges}
                 </div>

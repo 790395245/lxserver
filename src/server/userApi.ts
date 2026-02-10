@@ -516,11 +516,80 @@ async function loadSourcesFromDir(dirPath: string, owner: string, stats: { loade
     }
 }
 
+// 文件监控相关
+let fsWatcher: fs.FSWatcher | null = null
+const lastReloadMap = new Map<string, number>() // 记录每个用户的最后加载时间
+
+// 启动文件监控
+function startWatcher(sourceRoot: string) {
+    if (fsWatcher) return
+
+    console.log(`[UserApi] 启动源文件监控: ${sourceRoot}`)
+    const debounceMap = new Map<string, NodeJS.Timeout>()
+
+    try {
+        // Warning: recursive option for fs.watch is generally supported on Windows/macOS but not Linux
+        // For better cross-platform support, chokidar would be preferred, but using fs.watch as requested/minimal dependency
+        fsWatcher = fs.watch(sourceRoot, { recursive: true }, (eventType, filename) => {
+            if (!filename) return
+
+            // 仅关注 .js 和 sources.json 文件的变化
+            if (!filename.endsWith('.js') && !filename.endsWith('sources.json')) {
+                return
+            }
+
+            // 解析用户名 (目录名)
+            // filename on Windows might be "username\file.js"
+            const parts = (filename as string).split(path.sep)
+            let username = parts[0]
+
+            // 如果是 _open 目录，对应 'open' 用户
+            if (username === '_open') {
+                username = 'open'
+            }
+
+            // 简单的防抖处理
+            if (debounceMap.has(username)) {
+                clearTimeout(debounceMap.get(username)!)
+            }
+
+            debounceMap.set(username, setTimeout(() => {
+                // 检查是否是最近刚手动加载过 (避免面板上传造成的重复加载)
+                // 阈值设为 3000ms，假设手动上传触发的 reload 会在这个时间内完成
+                const lastReload = lastReloadMap.get(username) || 0
+                if (Date.now() - lastReload < 3000) {
+                    console.log(`[UserApi] [Watcher] 忽略近期更新的文件变动 (视为手动上传): ${filename}`)
+                    return
+                }
+
+                console.log(`[UserApi] [Watcher] 检测到文件变动 (${eventType}): ${filename} -> 重新加载 ${username}`)
+                initUserApis(username).catch(err => {
+                    console.error(`[UserApi] [Watcher] 重新加载失败:`, err)
+                })
+            }, 2000)) // 2秒防抖，等待文件写入完成
+        })
+
+        // 进程退出时关闭监听
+        process.on('exit', () => {
+            if (fsWatcher) fsWatcher.close()
+        })
+    } catch (e) {
+        console.error('[UserApi] 启动文件监控失败:', e)
+    }
+}
+
 // 从文件系统加载所有已启用的自定义源
 // 路径变更：/data/data/users/source/{username} 和 /data/data/users/source/_open
 export async function initUserApis(targetUser?: string) {
     const sourceRoot = path.join(process.cwd(), 'data', 'data', 'users', 'source')
     const stats = { loadedCount: 0 }
+
+    // 更新最后加载时间
+    if (targetUser) {
+        lastReloadMap.set(targetUser, Date.now())
+    } else {
+        // 全局加载
+    }
 
     console.log(`[UserApi] ========================================`)
 
@@ -529,6 +598,11 @@ export async function initUserApis(targetUser?: string) {
         console.log(`[UserApi] Source root directory not found: ${sourceRoot}`)
         console.log(`[UserApi] ========================================`)
         return
+    }
+
+    // 尝试启动监控 (只会在第一次调用且无 watcher 时启动)
+    if (!fsWatcher) {
+        startWatcher(sourceRoot)
     }
 
     if (targetUser) {
