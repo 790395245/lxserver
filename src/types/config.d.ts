@@ -121,6 +121,48 @@ declare namespace LX {
      * 是否禁用数据收集
      */
     disableTelemetry?: boolean
+
+    // ========== 音乐下载配置 ==========
+
+    /**
+     * 是否启用下载功能
+     */
+    'download.enabled'?: boolean
+
+    /**
+     * 自定义下载路径，空则使用 data/music/
+     */
+    'download.path'?: string
+
+    /**
+     * 音质优先级列表
+     */
+    'download.qualityPriority'?: string[]
+
+    /**
+     * 并发下载数
+     */
+    'download.concurrency'?: number
+
+    /**
+     * 是否启用自动下载
+     */
+    'download.autoEnabled'?: boolean
+
+    /**
+     * 自动下载检查间隔（分钟）
+     */
+    'download.autoInterval'?: number
+
+    /**
+     * 自动下载的目标用户列表（空=全部）
+     */
+    'download.autoUsers'?: string[]
+
+    /**
+     * 自动下载的目标歌单ID列表（空=全部）
+     */
+    'download.autoPlaylists'?: string[]
   }
 }
 

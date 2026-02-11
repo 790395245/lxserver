@@ -81,5 +81,37 @@ module.exports = {
   // 是否禁用数据收集
   // 环境变量: DISABLE_TELEMETRY (true/false)
   // 说明：仅收集版本号、运行环境（Docker/Node）、OS类型等非敏感信息用于项目改进。绝对匿名，不收集IP。
-  "disableTelemetry": false
+  "disableTelemetry": false,
+
+  // ========== 音乐下载配置 ==========
+
+  // 是否启用下载功能
+  // 环境变量: DOWNLOAD_ENABLED (true/false)
+  "download.enabled": true,
+
+  // 自定义下载路径（绝对路径），空则使用 data/music/
+  // 环境变量: DOWNLOAD_PATH
+  "download.path": "",
+
+  // 音质优先级列表，按顺序尝试，可选值: flac, flac24bit, 320k, 128k
+  // 环境变量: DOWNLOAD_QUALITY_PRIORITY (逗号分隔)
+  "download.qualityPriority": ["flac", "320k", "128k"],
+
+  // 并发下载数
+  // 环境变量: DOWNLOAD_CONCURRENCY
+  "download.concurrency": 3,
+
+  // 是否启用自动下载
+  // 环境变量: DOWNLOAD_AUTO_ENABLED (true/false)
+  "download.autoEnabled": true,
+
+  // 自动下载检查间隔 (分钟)
+  // 环境变量: DOWNLOAD_AUTO_INTERVAL
+  "download.autoInterval": 5,
+
+  // 自动下载的目标用户列表 (空数组=全部用户)
+  "download.autoUsers": [],
+
+  // 自动下载的目标歌单ID列表 (空数组=全部歌单)
+  "download.autoPlaylists": []
 }

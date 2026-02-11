@@ -16,6 +16,7 @@ import musicSdkRaw from '@/modules/utils/musicSdk/index.js'
 const musicSdk = musicSdkRaw as any
 import { initUserApis, callUserApiGetMusicUrl, isSourceSupported, getLoadedApis } from './userApi'
 import * as customSourceHandlers from './customSourceHandlers'
+import { initDownloadModule, getDownloadManager, getLocalMusicSource, getAutoDownloader } from './download'
 
 
 const getMime = (filename: string) => {
@@ -1323,6 +1324,19 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
             const source = songInfo.source
             let result
 
+            // 0. 优先查找本地已下载文件
+            const localSource = getLocalMusicSource()
+            if (localSource) {
+              const localEntry = localSource.findLocalFile(songInfo)
+              if (localEntry) {
+                console.log(`[MusicUrl] 使用本地文件: ${localEntry.relativePath}`)
+                result = {
+                  url: `/api/music/stream/${localEntry.fileId}`,
+                  type: localEntry.quality || quality || '128k',
+                }
+              }
+            }
+
             // 优先使用自定义源
             // 传递 clientUsername 进行权限过滤
             if (isSourceSupported(source, clientUsername)) {
@@ -1502,6 +1516,215 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
       }
       if (pathname === '/api/custom-source/delete' && req.method === 'POST') {
         return customSourceHandlers.handleDelete(req, res)
+      }
+
+      // ========== 音乐流传输 API ==========
+      if (pathname.startsWith('/api/music/stream/') && req.method === 'GET') {
+        const fileId = pathname.replace('/api/music/stream/', '')
+        if (!fileId) {
+          res.writeHead(400)
+          res.end('Missing fileId')
+          return
+        }
+
+        const localSource = getLocalMusicSource()
+        if (!localSource) {
+          res.writeHead(503)
+          res.end('Local music source not initialized')
+          return
+        }
+
+        const entry = localSource.findByFileId(fileId)
+        if (!entry || !fs.existsSync(entry.filePath)) {
+          res.writeHead(404)
+          res.end('File not found')
+          return
+        }
+
+        const stat = fs.statSync(entry.filePath)
+        const fileSize = stat.size
+        const mimeType = getMime(entry.filePath)
+
+        // 支持 Range 请求
+        const range = req.headers.range
+        if (range) {
+          const parts = range.replace(/bytes=/, '').split('-')
+          const start = parseInt(parts[0], 10)
+          const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1
+          const chunkSize = end - start + 1
+
+          res.writeHead(206, {
+            'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+            'Accept-Ranges': 'bytes',
+            'Content-Length': chunkSize,
+            'Content-Type': mimeType,
+          })
+          fs.createReadStream(entry.filePath, { start, end }).pipe(res)
+        } else {
+          res.writeHead(200, {
+            'Content-Length': fileSize,
+            'Content-Type': mimeType,
+            'Accept-Ranges': 'bytes',
+          })
+          fs.createReadStream(entry.filePath).pipe(res)
+        }
+        return
+      }
+
+      // ========== 下载管理 API ==========
+      if (pathname === '/api/download/start' && req.method === 'POST') {
+        const auth = req.headers['x-frontend-auth']
+        if (auth !== global.lx.config['frontend.password']) {
+          res.writeHead(401); res.end('Unauthorized'); return
+        }
+
+        if (!global.lx.config['download.enabled']) {
+          res.writeHead(403, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: '下载功能未启用' }))
+          return
+        }
+
+        void readBody(req).then(async body => {
+          try {
+            const { userName, listIds } = JSON.parse(body)
+            if (!userName) throw new Error('Missing userName')
+
+            const autoDownloader = getAutoDownloader()
+            if (!autoDownloader) throw new Error('AutoDownloader not initialized')
+
+            const result = await autoDownloader.manualDownload(userName, listIds)
+            res.writeHead(200, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ success: true, ...result }))
+          } catch (err: any) {
+            res.writeHead(500, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ error: err.message }))
+          }
+        })
+        return
+      }
+
+      if (pathname === '/api/download/tasks' && req.method === 'GET') {
+        const auth = req.headers['x-frontend-auth']
+        if (auth !== global.lx.config['frontend.password']) {
+          res.writeHead(401); res.end('Unauthorized'); return
+        }
+
+        const dm = getDownloadManager()
+        if (!dm) {
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ records: [], queueSize: 0, activeCount: 0 }))
+          return
+        }
+
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate'
+        })
+        res.end(JSON.stringify({
+          records: dm.getRecords(),
+          queueSize: dm.getQueueSize(),
+          activeCount: dm.getActiveCount(),
+        }))
+        return
+      }
+
+      if (pathname === '/api/download/retry' && req.method === 'POST') {
+        const auth = req.headers['x-frontend-auth']
+        if (auth !== global.lx.config['frontend.password']) {
+          res.writeHead(401); res.end('Unauthorized'); return
+        }
+
+        void readBody(req).then(body => {
+          try {
+            const { taskId } = JSON.parse(body)
+            const dm = getDownloadManager()
+            if (!dm) throw new Error('DownloadManager not initialized')
+
+            const success = dm.retryTask(taskId)
+            res.writeHead(200, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ success }))
+          } catch (err: any) {
+            res.writeHead(500, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ error: err.message }))
+          }
+        })
+        return
+      }
+
+      if (pathname === '/api/download/cancel' && req.method === 'POST') {
+        const auth = req.headers['x-frontend-auth']
+        if (auth !== global.lx.config['frontend.password']) {
+          res.writeHead(401); res.end('Unauthorized'); return
+        }
+
+        void readBody(req).then(body => {
+          try {
+            const { taskId } = JSON.parse(body)
+            const dm = getDownloadManager()
+            if (!dm) throw new Error('DownloadManager not initialized')
+
+            const success = dm.cancelTask(taskId)
+            res.writeHead(200, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ success }))
+          } catch (err: any) {
+            res.writeHead(500, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ error: err.message }))
+          }
+        })
+        return
+      }
+
+      if (pathname === '/api/download/clean' && req.method === 'DELETE') {
+        const auth = req.headers['x-frontend-auth']
+        if (auth !== global.lx.config['frontend.password']) {
+          res.writeHead(401); res.end('Unauthorized'); return
+        }
+
+        const dm = getDownloadManager()
+        if (!dm) {
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ removed: 0 }))
+          return
+        }
+
+        void readBody(req).then(body => {
+          try {
+            const { statuses } = JSON.parse(body)
+            const removed = dm.cleanRecords(statuses)
+            res.writeHead(200, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ removed }))
+          } catch (err: any) {
+            res.writeHead(400, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ error: err.message }))
+          }
+        })
+        return
+      }
+
+      if (pathname === '/api/download/progress' && req.method === 'GET') {
+        const auth = req.headers['x-frontend-auth'] || urlObj.searchParams.get('auth')
+        if (auth !== global.lx.config['frontend.password']) {
+          res.writeHead(401); res.end('Unauthorized'); return
+        }
+
+        res.writeHead(200, {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+        })
+        res.write('retry: 5000\n\n')
+
+        const dm = getDownloadManager()
+        if (dm) {
+          const unsubscribe = dm.onProgress(data => {
+            res.write(`data: ${JSON.stringify(data)}\n\n`)
+          })
+
+          req.on('close', () => {
+            unsubscribe()
+          })
+        }
+        return
       }
 
 
@@ -1692,6 +1915,15 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
             'webdav.username': global.lx.config['webdav.username'] || '',
             'webdav.password': global.lx.config['webdav.password'] || '',
             'sync.interval': global.lx.config['sync.interval'] || 60,
+            // 下载配置
+            'download.enabled': global.lx.config['download.enabled'] || false,
+            'download.path': global.lx.config['download.path'] || '',
+            'download.qualityPriority': global.lx.config['download.qualityPriority'] || ['flac', '320k', '128k'],
+            'download.concurrency': global.lx.config['download.concurrency'] || 3,
+            'download.autoEnabled': global.lx.config['download.autoEnabled'] || false,
+            'download.autoInterval': global.lx.config['download.autoInterval'] || 60,
+            'download.autoUsers': global.lx.config['download.autoUsers'] || [],
+            'download.autoPlaylists': global.lx.config['download.autoPlaylists'] || [],
           }
           res.writeHead(200, {
             'Content-Type': 'application/json',
@@ -1753,6 +1985,16 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
                 })
               }
 
+              // 下载配置
+              if (newConfig['download.enabled'] !== undefined) global.lx.config['download.enabled'] = newConfig['download.enabled']
+              if (newConfig['download.path'] !== undefined) global.lx.config['download.path'] = newConfig['download.path']
+              if (newConfig['download.qualityPriority'] !== undefined) global.lx.config['download.qualityPriority'] = newConfig['download.qualityPriority']
+              if (newConfig['download.concurrency'] !== undefined) global.lx.config['download.concurrency'] = parseInt(newConfig['download.concurrency'])
+              if (newConfig['download.autoEnabled'] !== undefined) global.lx.config['download.autoEnabled'] = newConfig['download.autoEnabled']
+              if (newConfig['download.autoInterval'] !== undefined) global.lx.config['download.autoInterval'] = parseInt(newConfig['download.autoInterval'])
+              if (newConfig['download.autoUsers'] !== undefined) global.lx.config['download.autoUsers'] = newConfig['download.autoUsers']
+              if (newConfig['download.autoPlaylists'] !== undefined) global.lx.config['download.autoPlaylists'] = newConfig['download.autoPlaylists']
+
               const configPath = path.join(process.cwd(), 'config.js')
               const configContent = `module.exports = ${JSON.stringify({
                 serverName: global.lx.config.serverName,
@@ -1765,6 +2007,14 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
                 'frontend.password': global.lx.config['frontend.password'],
                 'player.enableAuth': global.lx.config['player.enableAuth'],
                 'player.password': global.lx.config['player.password'],
+                'download.enabled': global.lx.config['download.enabled'],
+                'download.path': global.lx.config['download.path'],
+                'download.qualityPriority': global.lx.config['download.qualityPriority'],
+                'download.concurrency': global.lx.config['download.concurrency'],
+                'download.autoEnabled': global.lx.config['download.autoEnabled'],
+                'download.autoInterval': global.lx.config['download.autoInterval'],
+                'download.autoUsers': global.lx.config['download.autoUsers'],
+                'download.autoPlaylists': global.lx.config['download.autoPlaylists'],
                 users: global.lx.config.users.map(u => ({
                   name: u.name,
                   password: u.password,
@@ -2537,6 +2787,13 @@ export const startServer = async (port: number, ip: string) => {
     console.log('[Server] Custom user APIs initialized')
   } catch (err: any) {
     console.error('[Server] Failed to initialize user APIs:', err.message)
+  }
+
+  // 初始化下载模块（本地音乐源索引 + 下载管理器 + 自动下载）
+  try {
+    await initDownloadModule()
+  } catch (err: any) {
+    console.error('[Server] Failed to initialize download module:', err.message)
   }
 
   await handleStartServer(port, ip).then(() => {

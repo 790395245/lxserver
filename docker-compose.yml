@@ -4,14 +4,21 @@ services:
   lx-sync-server:
     build: .
     container_name: lx-sync-server
-    restart: always
+    restart: unless-stopped
+    # restart: always
     ports:
-      - "9527:9527"
+      - "19527:9527"
+      # - "9527:9527"
     volumes:
       # 数据持久化
       - ./data:/server/data
+      # - ./data:/app/data
     environment:
       # 环境变量配置，优先级高于 config.js
       - NODE_ENV=production
       # 示例：通过环境变量设置用户
       # - LX_USER_myuser=mypassword
+
+# 采用 Compose V3 最新语法，兼容绝大多数 Docker 版本
+version: '3.8'
+

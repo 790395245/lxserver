@@ -66,3 +66,6 @@ typings/
 knowledge
 lx-music-desktop-master
 debug.txt
+
+.claude/
+.serena/

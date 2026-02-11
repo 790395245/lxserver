@@ -179,6 +179,26 @@ if (envParams.WEBPLAYER_PASSWORD) {
 if (envParams.DISABLE_TELEMETRY) {
   global.lx.config.disableTelemetry = envParams.DISABLE_TELEMETRY === 'true'
 }
+if (envParams.DOWNLOAD_ENABLED) {
+  global.lx.config['download.enabled'] = envParams.DOWNLOAD_ENABLED === 'true'
+}
+if (envParams.DOWNLOAD_PATH) {
+  global.lx.config['download.path'] = envParams.DOWNLOAD_PATH
+}
+if (envParams.DOWNLOAD_QUALITY_PRIORITY) {
+  global.lx.config['download.qualityPriority'] = envParams.DOWNLOAD_QUALITY_PRIORITY.split(',').map(s => s.trim())
+}
+if (envParams.DOWNLOAD_CONCURRENCY) {
+  const num = parseInt(envParams.DOWNLOAD_CONCURRENCY)
+  if (!isNaN(num) && num > 0) global.lx.config['download.concurrency'] = num
+}
+if (envParams.DOWNLOAD_AUTO_ENABLED) {
+  global.lx.config['download.autoEnabled'] = envParams.DOWNLOAD_AUTO_ENABLED === 'true'
+}
+if (envParams.DOWNLOAD_AUTO_INTERVAL) {
+  const num = parseInt(envParams.DOWNLOAD_AUTO_INTERVAL)
+  if (!isNaN(num) && num > 0) global.lx.config['download.autoInterval'] = num
+}
 
 if (envUsers.length) {
   const users: LX.Config['users'] = []

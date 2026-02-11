@@ -34,6 +34,16 @@ const config: LX.Config = {
   'player.enableAuth': false,
   'player.password': '123456',
 
+  // 音乐下载配置
+  'download.enabled': false,          // 是否启用下载功能
+  'download.path': '',                // 自定义下载路径，空则使用 data/music/
+  'download.qualityPriority': ['flac', '320k', '128k'], // 音质优先级
+  'download.concurrency': 3,          // 并发下载数
+  'download.autoEnabled': false,      // 是否启用自动下载
+  'download.autoInterval': 60,        // 自动下载检查间隔（分钟）
+  'download.autoUsers': [] as string[],  // 自动下载的目标用户列表（空=全部）
+  'download.autoPlaylists': [] as string[], // 自动下载的目标歌单ID列表（空=全部）
+
 }
 
 export default config

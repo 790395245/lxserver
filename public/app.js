@@ -109,6 +109,9 @@ class App {
         this.bindWebDAVEvents();
         this.bindFileManagerEvents();
 
+        // 下载管理
+        this.bindDownloadEvents();
+
         // PWA 安装事件
         this.deferredPrompt = null;
         window.addEventListener('beforeinstallprompt', (e) => {
@@ -232,6 +235,7 @@ class App {
             dashboard: '仪表盘',
             users: '用户管理',
             data: '数据查看',
+            downloads: '下载管理',
             config: '系统配置',
             logs: '系统日志',
             webdav: 'WebDAV同步',
@@ -253,6 +257,10 @@ class App {
                 break;
             case 'data':
                 this.loadUserData();
+                break;
+            case 'downloads':
+                this.loadDownloadTasks();
+                this.initDownloadSSE();
                 break;
             case 'config':
                 this.loadConfig();
@@ -1313,6 +1321,35 @@ class App {
             if (form.elements['sync.interval']) {
                 form.elements['sync.interval'].value = config['sync.interval'] || 60;
             }
+
+            // 下载配置
+            if (form.elements['download.enabled']) {
+                form.elements['download.enabled'].checked = config['download.enabled'] === true;
+            }
+            if (form.elements['download.path']) {
+                form.elements['download.path'].value = config['download.path'] || '';
+            }
+            if (form.elements['download.qualityPriority']) {
+                const priority = config['download.qualityPriority'] || ['flac', '320k', '128k'];
+                form.elements['download.qualityPriority'].value = Array.isArray(priority) ? priority.join(',') : priority;
+            }
+            if (form.elements['download.concurrency']) {
+                form.elements['download.concurrency'].value = config['download.concurrency'] || 3;
+            }
+            if (form.elements['download.autoEnabled']) {
+                form.elements['download.autoEnabled'].checked = config['download.autoEnabled'] === true;
+            }
+            if (form.elements['download.autoInterval']) {
+                form.elements['download.autoInterval'].value = config['download.autoInterval'] || 60;
+            }
+            if (form.elements['download.autoUsers']) {
+                const users = config['download.autoUsers'] || [];
+                form.elements['download.autoUsers'].value = Array.isArray(users) ? users.join(',') : users;
+            }
+            if (form.elements['download.autoPlaylists']) {
+                const playlists = config['download.autoPlaylists'] || [];
+                form.elements['download.autoPlaylists'].value = Array.isArray(playlists) ? playlists.join(',') : playlists;
+            }
         } catch (err) {
             console.error('Failed to load config:', err);
         }
@@ -1336,6 +1373,14 @@ class App {
             'webdav.username': formData.get('webdav.username'),
             'webdav.password': formData.get('webdav.password'),
             'sync.interval': parseInt(formData.get('sync.interval')) || 60,
+            'download.enabled': formData.get('download.enabled') === 'on',
+            'download.path': formData.get('download.path') || '',
+            'download.qualityPriority': (formData.get('download.qualityPriority') || '').split(',').map(s => s.trim()).filter(s => s),
+            'download.concurrency': parseInt(formData.get('download.concurrency')) || 3,
+            'download.autoEnabled': formData.get('download.autoEnabled') === 'on',
+            'download.autoInterval': parseInt(formData.get('download.autoInterval')) || 60,
+            'download.autoUsers': (formData.get('download.autoUsers') || '').split(',').map(s => s.trim()).filter(s => s),
+            'download.autoPlaylists': (formData.get('download.autoPlaylists') || '').split(',').map(s => s.trim()).filter(s => s),
         };
 
         try {
@@ -2113,6 +2158,445 @@ class App {
             }
         } catch (err) {
             alert('重启请求失败: ' + err.message)
+        }
+    }
+
+    // ========== 下载管理功能 ==========
+
+    bindDownloadEvents() {
+        document.getElementById('start-download-btn')?.addEventListener('click', () => this.showManualDownloadModal());
+        document.getElementById('clean-completed-btn')?.addEventListener('click', () => this.cleanTasks(['completed']));
+        document.getElementById('clean-failed-btn')?.addEventListener('click', () => this.cleanTasks(['failed', 'cancelled']));
+        document.getElementById('refresh-tasks-btn')?.addEventListener('click', () => this.loadDownloadTasks());
+        document.getElementById('task-status-filter')?.addEventListener('change', () => this.filterTasks());
+
+        document.getElementById('download-all-playlists')?.addEventListener('change', (e) => {
+            const group = document.getElementById('playlist-selection-group');
+            if (group) group.style.display = e.target.checked ? 'none' : 'block';
+        });
+
+        document.getElementById('download-user-select')?.addEventListener('change', () => this.loadUserPlaylists());
+        document.getElementById('confirm-download-btn')?.addEventListener('click', () => this.startManualDownload());
+    }
+
+    async loadDownloadTasks() {
+        try {
+            const data = await this.request('/api/download/tasks');
+            this.currentDownloadTasks = data.records || [];
+            this.updateDownloadStats(data);
+            this.renderDownloadTasks();
+        } catch (err) {
+            console.error('Failed to load download tasks:', err);
+            const container = document.getElementById('download-tasks-list');
+            if (container) {
+                container.innerHTML = '<p style="color: var(--accent-error); padding: 2rem; text-align: center;">加载任务失败</p>';
+            }
+        }
+    }
+
+    updateDownloadStats(data) {
+        const { records = [], queueSize = 0, activeCount = 0 } = data;
+        const completedCount = records.filter(r => r.status === 'completed').length;
+        const failedCount = records.filter(r => r.status === 'failed').length;
+
+        const queueEl = document.getElementById('stat-queue-size');
+        const activeEl = document.getElementById('stat-active-count');
+        const completedEl = document.getElementById('stat-completed-count');
+        const failedEl = document.getElementById('stat-failed-count');
+
+        if (queueEl) queueEl.textContent = queueSize;
+        if (activeEl) activeEl.textContent = activeCount;
+        if (completedEl) completedEl.textContent = completedCount;
+        if (failedEl) failedEl.textContent = failedCount;
+    }
+
+    renderDownloadTasks() {
+        const container = document.getElementById('download-tasks-list');
+        if (!container) return;
+
+        const filter = document.getElementById('task-status-filter')?.value;
+        let tasks = this.currentDownloadTasks || [];
+
+        if (filter) {
+            tasks = tasks.filter(t => t.status === filter);
+        }
+
+        if (tasks.length === 0) {
+            container.innerHTML = '<p style="color: var(--text-secondary); padding: 2rem; text-align: center;">暂无任务</p>';
+            return;
+        }
+
+        tasks.sort((a, b) => {
+            const statusOrder = { downloading: 0, pending: 1, failed: 2, cancelled: 3, completed: 4 };
+            const orderA = statusOrder[a.status] ?? 5;
+            const orderB = statusOrder[b.status] ?? 5;
+            if (orderA !== orderB) return orderA - orderB;
+            return b.downloadTime - a.downloadTime;
+        });
+
+        container.innerHTML = tasks.map(task => this.renderTaskItem(task)).join('');
+    }
+
+    renderTaskItem(task) {
+        const statusConfig = {
+            pending: { text: '等待中', color: 'var(--text-secondary)', icon: 'clock' },
+            downloading: { text: '下载中', color: 'var(--accent-primary)', icon: 'download' },
+            completed: { text: '已完成', color: 'var(--accent-success)', icon: 'check' },
+            failed: { text: '失败', color: 'var(--accent-error)', icon: 'x' },
+            cancelled: { text: '已取消', color: 'var(--text-muted)', icon: 'x' }
+        };
+
+        const config = statusConfig[task.status] || statusConfig.pending;
+        const showProgress = task.status === 'downloading' || task.status === 'pending';
+        const showRetry = task.status === 'failed';
+        const showCancel = task.status === 'downloading' || task.status === 'pending';
+
+        return `
+            <div class="task-item" data-task-id="${task.id}" style="padding: 1rem; border-bottom: 1px solid var(--glass-border);">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+                    <div style="flex: 1;">
+                        <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">${this.escapeHtml(task.name)}</div>
+                        <div style="display: flex; gap: 1rem; font-size: 0.875rem; color: var(--text-secondary);">
+                            <span>${this.escapeHtml(task.singer)}</span>
+                            <span>${this.escapeHtml(task.source)}</span>
+                            ${task.quality ? `<span>${this.escapeHtml(task.quality)}</span>` : ''}
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; color: ${config.color};">
+                        ${this.getStatusIcon(config.icon)}
+                        <span style="font-size: 0.875rem;">${config.text}</span>
+                    </div>
+                </div>
+                ${showProgress ? `
+                    <div style="margin-bottom: 0.5rem;">
+                        <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;">
+                            <div style="width: ${task.progress}%; height: 100%; background: var(--accent-primary); transition: width 0.3s ease;"></div>
+                        </div>
+                        <span style="font-size: 0.75rem; color: var(--text-secondary);">${task.progress}%</span>
+                    </div>
+                ` : ''}
+                ${task.error ? `
+                    <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: rgba(239, 68, 68, 0.1); border-radius: 6px; margin-bottom: 0.5rem;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; color: var(--accent-error); flex-shrink: 0;">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="12" y1="8" x2="12" y2="12"/>
+                            <line x1="12" y1="16" x2="12.01" y2="16"/>
+                        </svg>
+                        <span style="font-size: 0.875rem; color: var(--accent-error);">${this.escapeHtml(task.error)}</span>
+                        ${task.retryCount > 0 ? `<span style="font-size: 0.75rem; color: var(--text-secondary);">(重试 ${task.retryCount} 次)</span>` : ''}
+                    </div>
+                ` : ''}
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; gap: 0.5rem;">
+                        ${showRetry ? `
+                            <button onclick="app.retryTask('${task.id}')" style="padding: 0.25rem 0.75rem; background: var(--accent-primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.875rem;">重试</button>
+                        ` : ''}
+                        ${showCancel ? `
+                            <button onclick="app.cancelTask('${task.id}')" style="padding: 0.25rem 0.75rem; background: var(--accent-error); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.875rem;">取消</button>
+                        ` : ''}
+                    </div>
+                    ${task.fileSize > 0 ? `<span style="font-size: 0.875rem; color: var(--text-secondary);">${this.formatFileSize(task.fileSize)}</span>` : ''}
+                </div>
+            </div>
+        `;
+    }
+
+    getStatusIcon(type) {
+        const icons = {
+            clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+            download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;"><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
+            check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;"><polyline points="20 6 9 17 4 12"/></svg>',
+            x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'
+        };
+        return icons[type] || '';
+    }
+
+    async retryTask(taskId) {
+        try {
+            await this.request('/api/download/retry', {
+                method: 'POST',
+                body: JSON.stringify({ taskId })
+            });
+            alert('任务已重新加入队列');
+            await this.loadDownloadTasks();
+        } catch (err) {
+            console.error('Failed to retry task:', err);
+            alert('重试任务失败: ' + err.message);
+        }
+    }
+
+    async cancelTask(taskId) {
+        try {
+            await this.request('/api/download/cancel', {
+                method: 'POST',
+                body: JSON.stringify({ taskId })
+            });
+            alert('任务已取消');
+            await this.loadDownloadTasks();
+        } catch (err) {
+            console.error('Failed to cancel task:', err);
+            alert('取消任务失败: ' + err.message);
+        }
+    }
+
+    async cleanTasks(statuses) {
+        try {
+            const result = await this.request('/api/download/clean', {
+                method: 'DELETE',
+                body: JSON.stringify({ statuses })
+            });
+            alert(`已清理 ${result.removed || 0} 条记录`);
+            await this.loadDownloadTasks();
+        } catch (err) {
+            console.error('Failed to clean tasks:', err);
+            alert('清理记录失败: ' + err.message);
+        }
+    }
+
+    filterTasks() {
+        this.renderDownloadTasks();
+    }
+
+    initDownloadSSE() {
+        // 关闭旧连接
+        if (this.downloadSSE) {
+            this.downloadSSE.close();
+            this.downloadSSE = null;
+        }
+
+        const auth = this.password || localStorage.getItem('lx_auth');
+        if (!auth) return;
+
+        this.downloadSSE = new EventSource(`/api/download/progress?auth=${encodeURIComponent(auth)}`);
+
+        // 任务更新事件
+        this.downloadSSE.addEventListener('task_update', (event) => {
+            try {
+                const task = JSON.parse(event.data);
+                this.updateTaskInList(task);
+            } catch (e) {
+                console.error('SSE task_update parse error:', e);
+            }
+        });
+
+        // 任务添加事件
+        this.downloadSSE.addEventListener('task_added', (event) => {
+            try {
+                const task = JSON.parse(event.data);
+                this.addTaskToList(task);
+            } catch (e) {
+                console.error('SSE task_added parse error:', e);
+            }
+        });
+
+        // 任务移除事件
+        this.downloadSSE.addEventListener('task_removed', (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                this.removeTaskFromList(data.taskId);
+            } catch (e) {
+                console.error('SSE task_removed parse error:', e);
+            }
+        });
+
+        // 队列状态更新事件
+        this.downloadSSE.addEventListener('queue_status', (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                this.updateDownloadStats(data);
+            } catch (e) {
+                console.error('SSE queue_status parse error:', e);
+            }
+        });
+
+        // 错误处理
+        this.downloadSSE.onerror = (err) => {
+            console.error('Download SSE error:', err);
+            if (this.downloadSSE) {
+                this.downloadSSE.close();
+                this.downloadSSE = null;
+            }
+            // 5秒后重连
+            setTimeout(() => {
+                if (this.currentView === 'downloads') {
+                    this.initDownloadSSE();
+                }
+            }, 5000);
+        };
+    }
+
+    updateTaskInList(task) {
+        // 更新内存中的任务列表
+        const index = this.currentDownloadTasks.findIndex(t => t.id === task.id);
+        if (index !== -1) {
+            this.currentDownloadTasks[index] = task;
+        } else {
+            this.currentDownloadTasks.push(task);
+        }
+
+        // 更新 DOM
+        const taskElement = document.querySelector(`[data-task-id="${task.id}"]`);
+        if (taskElement) {
+            taskElement.outerHTML = this.renderTaskItem(task);
+        }
+    }
+
+    addTaskToList(task) {
+        // 添加到内存列表
+        this.currentDownloadTasks.push(task);
+
+        // 添加到 DOM
+        const container = document.getElementById('download-tasks-list');
+        if (container) {
+            const emptyMsg = container.querySelector('p');
+            if (emptyMsg) {
+                emptyMsg.remove();
+            }
+            container.insertAdjacentHTML('afterbegin', this.renderTaskItem(task));
+        }
+    }
+
+    removeTaskFromList(taskId) {
+        // 从内存列表移除
+        this.currentDownloadTasks = this.currentDownloadTasks.filter(t => t.id !== taskId);
+
+        // 从 DOM 移除
+        const taskElement = document.querySelector(`[data-task-id="${taskId}"]`);
+        if (taskElement) {
+            taskElement.remove();
+        }
+
+        // 如果列表为空，显示提示
+        const container = document.getElementById('download-tasks-list');
+        if (container && container.children.length === 0) {
+            container.innerHTML = '<p style="color: var(--text-secondary); padding: 2rem; text-align: center;">暂无任务</p>';
+        }
+    }
+
+    async showManualDownloadModal() {
+        try {
+            // 加载用户列表
+            const users = await this.request('/api/users');
+            const userSelect = document.getElementById('download-user-select');
+            if (!userSelect) return;
+
+            // 填充用户下拉框
+            userSelect.innerHTML = '<option value="">请选择用户</option>';
+            users.forEach(user => {
+                userSelect.innerHTML += `<option value="${this.escapeHtml(user.name)}">${this.escapeHtml(user.name)}</option>`;
+            });
+
+            // 清空歌单选择
+            const playlistGroup = document.getElementById('playlist-selection-group');
+            const playlistCheckboxes = document.getElementById('playlist-checkboxes');
+            if (playlistGroup) playlistGroup.style.display = 'none';
+            if (playlistCheckboxes) playlistCheckboxes.innerHTML = '';
+
+            // 重置全部歌单复选框
+            const allPlaylistsCheckbox = document.getElementById('download-all-playlists');
+            if (allPlaylistsCheckbox) allPlaylistsCheckbox.checked = true;
+
+            // 显示模态框
+            const modal = document.getElementById('manual-download-modal');
+            if (modal) modal.classList.remove('hidden');
+        } catch (err) {
+            console.error('Failed to load users:', err);
+            alert('加载用户列表失败: ' + err.message);
+        }
+    }
+
+    async loadUserPlaylists() {
+        const userSelect = document.getElementById('download-user-select');
+        const playlistCheckboxes = document.getElementById('playlist-checkboxes');
+        if (!userSelect || !playlistCheckboxes) return;
+
+        const userName = userSelect.value;
+        if (!userName) {
+            playlistCheckboxes.innerHTML = '';
+            return;
+        }
+
+        try {
+            // 加载用户数据
+            const data = await this.request(`/api/data?user=${encodeURIComponent(userName)}`);
+
+            // 渲染歌单复选框
+            let html = '';
+
+            // 系统列表
+            html += '<div style="margin-bottom: 1rem;"><strong style="color: var(--text-primary);">系统列表</strong></div>';
+            html += `
+                <label class="checkbox-label" style="display: block; padding: 0.5rem; margin-bottom: 0.5rem;">
+                    <input type="checkbox" value="default" style="margin-right: 0.5rem;">
+                    <span>默认列表 (${data.defaultList?.length || 0} 首)</span>
+                </label>
+                <label class="checkbox-label" style="display: block; padding: 0.5rem; margin-bottom: 0.5rem;">
+                    <input type="checkbox" value="love" style="margin-right: 0.5rem;">
+                    <span>我的收藏 (${data.loveList?.length || 0} 首)</span>
+                </label>
+            `;
+
+            // 自定义列表
+            if (data.userList && data.userList.length > 0) {
+                html += '<div style="margin: 1rem 0;"><strong style="color: var(--text-primary);">自定义列表</strong></div>';
+                data.userList.forEach(list => {
+                    html += `
+                        <label class="checkbox-label" style="display: block; padding: 0.5rem; margin-bottom: 0.5rem;">
+                            <input type="checkbox" value="${this.escapeHtml(list.id)}" style="margin-right: 0.5rem;">
+                            <span>${this.escapeHtml(list.name)} (${list.list?.length || 0} 首)</span>
+                        </label>
+                    `;
+                });
+            }
+
+            playlistCheckboxes.innerHTML = html;
+        } catch (err) {
+            console.error('Failed to load playlists:', err);
+            playlistCheckboxes.innerHTML = '<p style="color: var(--accent-error); padding: 1rem;">加载歌单失败</p>';
+        }
+    }
+
+    async startManualDownload() {
+        const userSelect = document.getElementById('download-user-select');
+        const allPlaylistsCheckbox = document.getElementById('download-all-playlists');
+        const playlistCheckboxes = document.getElementById('playlist-checkboxes');
+
+        if (!userSelect) return;
+
+        const userName = userSelect.value;
+        if (!userName) {
+            alert('请选择用户');
+            return;
+        }
+
+        // 收集选中的歌单
+        let listIds = undefined;
+        if (allPlaylistsCheckbox && !allPlaylistsCheckbox.checked && playlistCheckboxes) {
+            const checkedBoxes = playlistCheckboxes.querySelectorAll('input[type="checkbox"]:checked');
+            listIds = Array.from(checkedBoxes).map(cb => cb.value);
+            if (listIds.length === 0) {
+                alert('请至少选择一个歌单');
+                return;
+            }
+        }
+
+        try {
+            const result = await this.request('/api/download/start', {
+                method: 'POST',
+                body: JSON.stringify({ userName, listIds })
+            });
+
+            alert(`扫描完成: 扫描 ${result.scanned} 首, 新增下载 ${result.added} 首`);
+
+            // 关闭模态框
+            const modal = document.getElementById('manual-download-modal');
+            if (modal) modal.classList.add('hidden');
+
+            // 刷新任务列表
+            await this.loadDownloadTasks();
+        } catch (err) {
+            console.error('Failed to start download:', err);
+            alert('启动下载失败: ' + err.message);
         }
     }
 }
