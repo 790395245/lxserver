@@ -40,6 +40,17 @@ const getMime = (filename: string) => {
   return mimeTypes[ext] || 'application/octet-stream'
 }
 
+// 认证辅助函数
+function checkAuth(authHeader: string | undefined): boolean {
+  if (!authHeader) return false
+
+  // 支持 Bearer token 格式
+  const token = authHeader.replace(/^Bearer\s+/i, '')
+  const frontendPassword = global.lx.config['frontend.password'] || ''
+
+  return token === frontendPassword
+}
+
 let status: LX.Sync.Status = {
   status: false,
   message: '',
@@ -1494,6 +1505,238 @@ const handleStartServer = async (port = 9527, ip = '127.0.0.1') => await new Pro
             res.end(err.message)
           }
         })
+        return
+      }
+
+      // ========== 本地音乐源 API ==========
+      // [新增] 搜索本地音乐 API
+      if (pathname === '/api/local-music/search' && req.method === 'GET') {
+        // 认证检查
+        const authHeader = req.headers['authorization']
+        if (!checkAuth(authHeader)) {
+          res.writeHead(401, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: 'Unauthorized' }))
+          return
+        }
+
+        // 配置检查
+        if (global.lx.config['localMusicSource.enabled'] === false) {
+          res.writeHead(403, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: 'Local music source feature is disabled' }))
+          return
+        }
+
+        const keyword = urlObj.searchParams.get('keyword') || ''
+        const page = parseInt(urlObj.searchParams.get('page') || '1', 10)
+        const limit = Math.min(parseInt(urlObj.searchParams.get('limit') || '30', 10), 100)
+        const offset = (page - 1) * limit
+
+        const localSource = getLocalMusicSource()
+        if (!localSource) {
+          res.writeHead(503, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: 'Local music source not initialized' }))
+          return
+        }
+
+        // 搜索逻辑
+        let allEntries = localSource.getAllEntries()
+        if (keyword) {
+          const keywordLower = keyword.toLowerCase()
+          allEntries = allEntries.filter(e =>
+            e.name.toLowerCase().includes(keywordLower) ||
+            e.singer.toLowerCase().includes(keywordLower)
+          )
+        }
+
+        const total = allEntries.length
+        const items = allEntries.slice(offset, offset + limit).map(e => ({
+          songmid: e.fileId,
+          songname: e.name,
+          singer: e.singer,
+          source: 'local',
+          interval: null,
+          albumName: null,
+          albumId: null,
+          _source: e.source,
+          _songId: e.songId,
+          _quality: e.quality,
+          _fileSize: e.fileSize
+        }))
+
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({
+          success: true,
+          total,
+          page,
+          limit,
+          list: items
+        }))
+        return
+      }
+
+      // [新增] 获取本地音乐信息 API
+      if (pathname === '/api/local-music/info' && req.method === 'GET') {
+        // 认证检查
+        const authHeader = req.headers['authorization']
+        if (!checkAuth(authHeader)) {
+          res.writeHead(401, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: 'Unauthorized' }))
+          return
+        }
+
+        // 配置检查
+        if (global.lx.config['localMusicSource.enabled'] === false) {
+          res.writeHead(403, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: 'Local music source feature is disabled' }))
+          return
+        }
+
+        const fileId = urlObj.searchParams.get('fileId') || ''
+        if (!fileId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: 'Missing fileId parameter' }))
+          return
+        }
+
+        const localSource = getLocalMusicSource()
+        if (!localSource) {
+          res.writeHead(503, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: 'Local music source not initialized' }))
+          return
+        }
+
+        const entry = localSource.findByFileId(fileId)
+        if (!entry) {
+          res.writeHead(404, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: 'File not found' }))
+          return
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({
+          success: true,
+          info: {
+            fileId: entry.fileId,
+            name: entry.name,
+            singer: entry.singer,
+            source: entry.source,
+            songId: entry.songId,
+            quality: entry.quality,
+            fileSize: entry.fileSize,
+            relativePath: entry.relativePath
+          }
+        }))
+        return
+      }
+
+      // [新增] 下载客户端自定义源脚本 API
+      if (pathname === '/api/local-music/script' && req.method === 'GET') {
+        // 配置检查
+        if (global.lx.config['localMusicSource.enabled'] === false) {
+          res.writeHead(403, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: 'Local music source feature is disabled' }))
+          return
+        }
+
+        const serverUrl = `http://${req.headers.host}`
+        const password = global.lx.config['frontend.password'] || ''
+
+        const scriptContent = `/*!
+ * @name LX Server 本地音乐源
+ * @description 连接到 LX Music Sync Server，使用服务器上已下载的音乐
+ * @version 1.0.0
+ * @author lxmusic
+ * @homepage https://github.com/lyswhut/lx-music-desktop
+ */
+
+// ========== 配置区域 ==========
+// 用户需要修改以下配置
+const SERVER_URL = '${serverUrl}'  // 服务器地址
+const SERVER_PASSWORD = '${password}'          // 服务器密码
+
+// ========== 核心代码 ==========
+const { EVENT_NAMES, request, on, send } = globalThis.lx
+
+// HTTP 请求封装
+const httpRequest = (url, options = {}) => {
+  return new Promise((resolve, reject) => {
+    const defaultOptions = {
+      method: 'GET',
+      headers: {
+        'Authorization': \`Bearer \${SERVER_PASSWORD}\`,
+        'User-Agent': 'LX-Music-Desktop'
+      },
+      ...options
+    }
+
+    request(url, defaultOptions, (err, resp) => {
+      if (err) return reject(err)
+      if (resp.statusCode !== 200) {
+        return reject(new Error(\`HTTP \${resp.statusCode}\`))
+      }
+
+      try {
+        const data = JSON.parse(resp.body)
+        resolve(data)
+      } catch (e) {
+        reject(new Error('Invalid JSON response'))
+      }
+    })
+  })
+}
+
+// 搜索音乐
+const searchMusic = async (keyword, page = 1, limit = 30) => {
+  const url = \`\${SERVER_URL}/api/local-music/search?keyword=\${encodeURIComponent(keyword)}&page=\${page}&limit=\${limit}\`
+  const result = await httpRequest(url)
+  return result.list || []
+}
+
+// 获取音乐 URL
+const getMusicUrl = async (musicInfo, quality) => {
+  const fileId = musicInfo.songmid
+  return {
+    url: \`\${SERVER_URL}/api/music/stream/\${fileId}\`,
+    type: musicInfo._quality || quality || '128k'
+  }
+}
+
+// 事件处理
+on(EVENT_NAMES.request, async ({ action, source, info }) => {
+  if (source !== 'local') {
+    throw new Error('Unsupported source')
+  }
+
+  switch (action) {
+    case 'musicUrl':
+      return await getMusicUrl(info.musicInfo, info.type)
+
+    case 'search':
+      return await searchMusic(info.text, info.page, info.limit)
+
+    default:
+      throw new Error(\`Unsupported action: \${action}\`)
+  }
+})
+
+// 注册源
+send(EVENT_NAMES.inited, {
+  sources: {
+    local: {
+      name: 'LX Server 本地音乐',
+      type: 'music',
+      actions: ['musicUrl', 'search'],
+      qualitys: ['128k', '320k', 'flac', 'flac24bit']
+    }
+  }
+})
+`
+
+        res.writeHead(200, {
+          'Content-Type': 'application/javascript; charset=utf-8',
+          'Content-Disposition': 'attachment; filename="lx_server_local_music.js"'
+        })
+        res.end(scriptContent)
         return
       }
 

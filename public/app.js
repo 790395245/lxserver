@@ -91,6 +91,8 @@ class App {
             this.saveConfig();
         });
         document.getElementById('reload-config-btn')?.addEventListener('click', () => this.loadConfig());
+        document.getElementById('download-script-btn')?.addEventListener('click', () => this.downloadScript());
+
 
         // 日志查看
         document.getElementById('refresh-logs-btn')?.addEventListener('click', () => this.loadLogs());
@@ -1350,6 +1352,11 @@ class App {
                 const playlists = config['download.autoPlaylists'] || [];
                 form.elements['download.autoPlaylists'].value = Array.isArray(playlists) ? playlists.join(',') : playlists;
             }
+
+            // 本地音乐源配置
+            if (form.elements['localMusicSource.enabled']) {
+                form.elements['localMusicSource.enabled'].checked = config['localMusicSource.enabled'] !== false;
+            }
         } catch (err) {
             console.error('Failed to load config:', err);
         }
@@ -1381,6 +1388,7 @@ class App {
             'download.autoInterval': parseInt(formData.get('download.autoInterval')) || 60,
             'download.autoUsers': (formData.get('download.autoUsers') || '').split(',').map(s => s.trim()).filter(s => s),
             'download.autoPlaylists': (formData.get('download.autoPlaylists') || '').split(',').map(s => s.trim()).filter(s => s),
+            'localMusicSource.enabled': formData.get('localMusicSource.enabled') === 'on',
         };
 
         try {
@@ -1403,6 +1411,16 @@ class App {
         } catch (err) {
             alert('配置保存失败: ' + err.message);
         }
+    }
+
+    downloadScript() {
+        // 创建一个隐藏的 <a> 标签并触发下载
+        const link = document.createElement('a');
+        link.href = '/api/local-music/script';
+        link.download = 'lx_server_local_music.js';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     }
 
     async loadLogs() {

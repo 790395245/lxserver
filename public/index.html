@@ -528,6 +528,30 @@
                             </small>
                         </div>
 
+                        <h3 style="margin-top: 2rem;">本地音乐源配置</h3>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="localMusicSource.enabled" />
+                                <span>启用本地音乐源功能</span>
+                            </label>
+                            <small style="color: var(--text-secondary); font-size: 0.875rem; display: block; margin-top: 0.25rem;">
+                                开启后，客户端可以通过自定义源脚本远程访问服务器上已下载的音乐。
+                            </small>
+                        </div>
+                        <div class="form-group">
+                            <button type="button" id="download-script-btn" class="btn-secondary" style="display: flex; align-items: center; gap: 0.5rem;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="7 10 12 15 17 10"/>
+                                    <line x1="12" y1="15" x2="12" y2="3"/>
+                                </svg>
+                                <span>下载客户端脚本</span>
+                            </button>
+                            <small style="color: var(--text-secondary); font-size: 0.875rem; display: block; margin-top: 0.5rem;">
+                                下载后导入到 LX Music 客户端即可使用
+                            </small>
+                        </div>
+
                         <div class="form-actions">
                             <button type="submit" class="btn-primary">保存配置</button>
                             <button type="button" id="reload-config-btn" class="btn-secondary">重新加载</button>

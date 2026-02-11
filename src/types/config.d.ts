@@ -163,6 +163,13 @@ declare namespace LX {
      * 自动下载的目标歌单ID列表（空=全部）
      */
     'download.autoPlaylists'?: string[]
+
+    // ========== 本地音乐源配置 ==========
+
+    /**
+     * 是否启用本地音乐源功能（允许客户端通过自定义源脚本远程访问服务器音乐）
+     */
+    'localMusicSource.enabled'?: boolean
   }
 }
 

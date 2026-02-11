@@ -44,6 +44,9 @@ const config: LX.Config = {
   'download.autoUsers': [] as string[],  // 自动下载的目标用户列表（空=全部）
   'download.autoPlaylists': [] as string[], // 自动下载的目标歌单ID列表（空=全部）
 
+  // 本地音乐源配置
+  'localMusicSource.enabled': true,   // 是否启用本地音乐源功能（允许客户端通过自定义源脚本远程访问服务器音乐）
+
 }
 
 export default config
