@@ -1,10 +1,11 @@
-FROM alpine AS base
+FROM docker.1ms.run/alpine AS base
 
 FROM base AS builder
 WORKDIR /source-code
 COPY . .
 
-RUN apk add --update \
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories && \
+    apk add --update --no-cache \
     g++ \
     make \
     py3-pip \

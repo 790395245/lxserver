@@ -440,6 +440,262 @@ export async function callUserApiGetMusicUrl(
     throw new Error(`已尝试 ${supportedCount} 个支持 ${source} 的源 (或单源尝试 ${supportedCount === 1 ? 3 : supportedCount} 次)，但全部失败。最后错误: ${lastError?.message}`)
 }
 
+/**
+ * 调用自定义源搜索音乐
+ */
+export async function callUserApiSearch(
+    source: string,
+    keyword: string,
+    page: number = 1,
+    clientUsername?: string
+): Promise<any> {
+    let supportedCount = 0
+    let lastError: Error | null = null
+
+    // 查找支持该 source 和 search action 的 API
+    const candidates: any[] = []
+    for (const [apiId, api] of loadedApis) {
+        if (!api.info.enabled) continue
+        if (!api.info.sources || !api.info.sources[source]) continue
+
+        // 检查是否支持 search action
+        const sourceInfo = api.info.sources[source]
+        if (!sourceInfo.actions || !sourceInfo.actions.includes('search')) continue
+
+        // 权限校验
+        if (api.info.owner === 'open' || (clientUsername && api.info.owner === clientUsername)) {
+            candidates.push(api)
+        }
+    }
+
+    supportedCount = candidates.length
+
+    if (supportedCount === 0) {
+        throw new Error(`未找到支持 ${source} 平台搜索功能的自定义源`)
+    }
+
+    // 重试策略：单源重试3次，多源轮询
+    if (supportedCount === 1) {
+        const api = candidates[0]
+        const maxRetries = 3
+
+        for (let i = 0; i < maxRetries; i++) {
+            try {
+                console.log(`[UserApi] 尝试 ${api.info.name} 搜索 ${source} (第 ${i + 1}/${maxRetries} 次)`)
+
+                const result = await api.callRequest('search', source, {
+                    keyword,
+                    page,
+                    limit: 20
+                })
+
+                console.log(`[UserApi] ✓ ${api.info.name} 搜索成功`)
+                return result
+            } catch (error: any) {
+                console.error(`[UserApi] ${api.info.name} 搜索失败 (第 ${i + 1}/${maxRetries} 次):`, error.message)
+                lastError = error
+                if (i < maxRetries - 1) {
+                    await new Promise(r => setTimeout(r, 1000))
+                }
+            }
+        }
+    } else {
+        // 多个源，轮流尝试
+        for (const api of candidates) {
+            try {
+                console.log(`[UserApi] 尝试 ${api.info.name} 搜索 ${source}`)
+
+                const result = await api.callRequest('search', source, {
+                    keyword,
+                    page,
+                    limit: 20
+                })
+
+                console.log(`[UserApi] ✓ ${api.info.name} 搜索成功`)
+                return result
+            } catch (error: any) {
+                console.error(`[UserApi] ${api.info.name} 搜索失败:`, error.message)
+                lastError = error
+                continue
+            }
+        }
+    }
+
+    throw new Error(`已尝试 ${supportedCount} 个支持 ${source} 搜索的源，但全部失败。最后错误: ${lastError?.message}`)
+}
+
+/**
+ * 调用自定义源获取歌词
+ */
+export async function callUserApiLyric(
+    source: string,
+    songInfo: any,
+    clientUsername?: string
+): Promise<any> {
+    // 标准化 songInfo（复用 musicUrl 的逻辑）
+    const normalizedSongInfo = { ...songInfo }
+    if (songInfo.meta) {
+        Object.assign(normalizedSongInfo, songInfo.meta)
+        delete normalizedSongInfo.meta
+    }
+
+    let supportedCount = 0
+    let lastError: Error | null = null
+
+    // 查找支持该 source 和 lyric action 的 API
+    const candidates: any[] = []
+    for (const [apiId, api] of loadedApis) {
+        if (!api.info.enabled) continue
+        if (!api.info.sources || !api.info.sources[source]) continue
+
+        // 检查是否支持 lyric action
+        const sourceInfo = api.info.sources[source]
+        if (!sourceInfo.actions || !sourceInfo.actions.includes('lyric')) continue
+
+        // 权限校验
+        if (api.info.owner === 'open' || (clientUsername && api.info.owner === clientUsername)) {
+            candidates.push(api)
+        }
+    }
+
+    supportedCount = candidates.length
+
+    if (supportedCount === 0) {
+        throw new Error(`未找到支持 ${source} 平台歌词功能的自定义源`)
+    }
+
+    // 重试策略
+    if (supportedCount === 1) {
+        const api = candidates[0]
+        const maxRetries = 3
+
+        for (let i = 0; i < maxRetries; i++) {
+            try {
+                console.log(`[UserApi] 尝试 ${api.info.name} 获取 ${source} 歌词 (第 ${i + 1}/${maxRetries} 次)`)
+
+                const result = await api.callRequest('lyric', source, {
+                    musicInfo: normalizedSongInfo
+                })
+
+                console.log(`[UserApi] ✓ ${api.info.name} 获取歌词成功`)
+                return result
+            } catch (error: any) {
+                console.error(`[UserApi] ${api.info.name} 获取歌词失败 (第 ${i + 1}/${maxRetries} 次):`, error.message)
+                lastError = error
+                if (i < maxRetries - 1) {
+                    await new Promise(r => setTimeout(r, 1000))
+                }
+            }
+        }
+    } else {
+        // 多个源，轮流尝试
+        for (const api of candidates) {
+            try {
+                console.log(`[UserApi] 尝试 ${api.info.name} 获取 ${source} 歌词`)
+
+                const result = await api.callRequest('lyric', source, {
+                    musicInfo: normalizedSongInfo
+                })
+
+                console.log(`[UserApi] ✓ ${api.info.name} 获取歌词成功`)
+                return result
+            } catch (error: any) {
+                console.error(`[UserApi] ${api.info.name} 获取歌词失败:`, error.message)
+                lastError = error
+                continue
+            }
+        }
+    }
+
+    throw new Error(`已尝试 ${supportedCount} 个支持 ${source} 歌词的源，但全部失败。最后错误: ${lastError?.message}`)
+}
+
+/**
+ * 调用自定义源获取封面
+ */
+export async function callUserApiPic(
+    source: string,
+    songInfo: any,
+    clientUsername?: string
+): Promise<any> {
+    // 标准化 songInfo
+    const normalizedSongInfo = { ...songInfo }
+    if (songInfo.meta) {
+        Object.assign(normalizedSongInfo, songInfo.meta)
+        delete normalizedSongInfo.meta
+    }
+
+    let supportedCount = 0
+    let lastError: Error | null = null
+
+    // 查找支持该 source 和 pic action 的 API
+    const candidates: any[] = []
+    for (const [apiId, api] of loadedApis) {
+        if (!api.info.enabled) continue
+        if (!api.info.sources || !api.info.sources[source]) continue
+
+        // 检查是否支持 pic action
+        const sourceInfo = api.info.sources[source]
+        if (!sourceInfo.actions || !sourceInfo.actions.includes('pic')) continue
+
+        // 权限校验
+        if (api.info.owner === 'open' || (clientUsername && api.info.owner === clientUsername)) {
+            candidates.push(api)
+        }
+    }
+
+    supportedCount = candidates.length
+
+    if (supportedCount === 0) {
+        throw new Error(`未找到支持 ${source} 平台封面功能的自定义源`)
+    }
+
+    // 重试策略
+    if (supportedCount === 1) {
+        const api = candidates[0]
+        const maxRetries = 3
+
+        for (let i = 0; i < maxRetries; i++) {
+            try {
+                console.log(`[UserApi] 尝试 ${api.info.name} 获取 ${source} 封面 (第 ${i + 1}/${maxRetries} 次)`)
+
+                const result = await api.callRequest('pic', source, {
+                    musicInfo: normalizedSongInfo
+                })
+
+                console.log(`[UserApi] ✓ ${api.info.name} 获取封面成功`)
+                return result
+            } catch (error: any) {
+                console.error(`[UserApi] ${api.info.name} 获取封面失败 (第 ${i + 1}/${maxRetries} 次):`, error.message)
+                lastError = error
+                if (i < maxRetries - 1) {
+                    await new Promise(r => setTimeout(r, 1000))
+                }
+            }
+        }
+    } else {
+        // 多个源，轮流尝试
+        for (const api of candidates) {
+            try {
+                console.log(`[UserApi] 尝试 ${api.info.name} 获取 ${source} 封面`)
+
+                const result = await api.callRequest('pic', source, {
+                    musicInfo: normalizedSongInfo
+                })
+
+                console.log(`[UserApi] ✓ ${api.info.name} 获取封面成功`)
+                return result
+            } catch (error: any) {
+                console.error(`[UserApi] ${api.info.name} 获取封面失败:`, error.message)
+                lastError = error
+                continue
+            }
+        }
+    }
+
+    throw new Error(`已尝试 ${supportedCount} 个支持 ${source} 封面的源，但全部失败。最后错误: ${lastError?.message}`)
+}
+
 // 辅助函数：加载指定目录下的源
 async function loadSourcesFromDir(dirPath: string, owner: string, stats: { loadedCount: number }) {
     const metaPath = path.join(dirPath, 'sources.json')

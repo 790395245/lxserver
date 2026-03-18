@@ -1761,6 +1761,130 @@ send(EVENT_NAMES.inited, {
         return customSourceHandlers.handleDelete(req, res)
       }
 
+      // ========== 智能代理 API ==========
+      // 获取音乐播放链接
+      if (pathname === '/api/proxy/musicUrl' && req.method === 'POST') {
+        try {
+          const body = await readBody(req)
+          const { source, songInfo, quality } = JSON.parse(body)
+
+          if (!source || !songInfo || !quality) {
+            res.writeHead(400, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ error: 'Missing required parameters: source, songInfo, quality' }))
+            return
+          }
+
+          const result = await callUserApiGetMusicUrl(source, songInfo, quality, 'open')
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify(result))
+        } catch (error: any) {
+          console.error('[Proxy] musicUrl error:', error)
+          res.writeHead(500, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: error.message }))
+        }
+        return
+      }
+
+      // 搜索音乐
+      if (pathname === '/api/proxy/search' && req.method === 'POST') {
+        try {
+          const body = await readBody(req)
+          const { source, keyword, page } = JSON.parse(body)
+
+          if (!source || !keyword) {
+            res.writeHead(400, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ error: 'Missing required parameters: source, keyword' }))
+            return
+          }
+
+          const { callUserApiSearch } = await import('./userApi.js')
+          const result = await callUserApiSearch(source, keyword, page || 1, 'open')
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify(result))
+        } catch (error: any) {
+          console.error('[Proxy] search error:', error)
+          res.writeHead(500, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: error.message }))
+        }
+        return
+      }
+
+      // 获取歌词
+      if (pathname === '/api/proxy/lyric' && req.method === 'POST') {
+        try {
+          const body = await readBody(req)
+          const { source, songInfo } = JSON.parse(body)
+
+          if (!source || !songInfo) {
+            res.writeHead(400, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ error: 'Missing required parameters: source, songInfo' }))
+            return
+          }
+
+          const { callUserApiLyric } = await import('./userApi.js')
+          const result = await callUserApiLyric(source, songInfo, 'open')
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify(result))
+        } catch (error: any) {
+          console.error('[Proxy] lyric error:', error)
+          res.writeHead(500, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: error.message }))
+        }
+        return
+      }
+
+      // 获取封面
+      if (pathname === '/api/proxy/pic' && req.method === 'POST') {
+        try {
+          const body = await readBody(req)
+          const { source, songInfo } = JSON.parse(body)
+
+          if (!source || !songInfo) {
+            res.writeHead(400, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ error: 'Missing required parameters: source, songInfo' }))
+            return
+          }
+
+          const { callUserApiPic } = await import('./userApi.js')
+          const result = await callUserApiPic(source, songInfo, 'open')
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify(result))
+        } catch (error: any) {
+          console.error('[Proxy] pic error:', error)
+          res.writeHead(500, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: error.message }))
+        }
+        return
+      }
+
+      // 下载客户端代理脚本
+      if (pathname === '/api/proxy/script' && req.method === 'GET') {
+        const scriptPath = path.join(process.cwd(), 'public', 'lx_proxy_source.js')
+
+        if (!fs.existsSync(scriptPath)) {
+          res.writeHead(404)
+          res.end('Script not found')
+          return
+        }
+
+        const scriptTemplate = fs.readFileSync(scriptPath, 'utf-8')
+
+        // 替换配置占位符
+        const serverUrl = `http://${req.headers.host}`
+        const serverPassword = global.lx.config['frontend.password'] || ''
+
+        const scriptContent = scriptTemplate
+          .replace('{{SERVER_URL}}', serverUrl)
+          .replace('{{SERVER_PASSWORD}}', serverPassword)
+
+        res.writeHead(200, {
+          'Content-Type': 'application/javascript; charset=utf-8',
+          'Content-Disposition': 'attachment; filename="lx_proxy_source.js"'
+        })
+        res.end(scriptContent)
+        return
+      }
+
       // ========== 音乐流传输 API ==========
       if (pathname.startsWith('/api/music/stream/') && req.method === 'GET') {
         const fileId = pathname.replace('/api/music/stream/', '')
@@ -1960,6 +2084,8 @@ send(EVENT_NAMES.inited, {
         const dm = getDownloadManager()
         if (dm) {
           const unsubscribe = dm.onProgress(data => {
+            // 根据事件类型发送不同的 event 字段
+            res.write(`event: ${data.type}\n`)
             res.write(`data: ${JSON.stringify(data)}\n\n`)
           })
 

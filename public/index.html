@@ -102,6 +102,15 @@
                     </svg>
                     <span>下载管理</span>
                 </a>
+                <a href="#" class="nav-item" data-view="sources">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"/>
+                        <rect x="14" y="3" width="7" height="7"/>
+                        <rect x="14" y="14" width="7" height="7"/>
+                        <rect x="3" y="14" width="7" height="7"/>
+                    </svg>
+                    <span>音乐源管理</span>
+                </a>
                 <a href="#" class="nav-item" data-view="config">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="3" />
@@ -868,6 +877,90 @@
                     </div>
                 </div>
 
+                <!-- 音乐源管理视图 -->
+                <div id="view-sources" class="view">
+                    <div class="view-header" style="display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap; align-items: center;">
+                        <h2 style="flex: 1; margin: 0;">音乐源管理</h2>
+                        <button id="add-source-btn" class="btn-primary" style="display: flex; align-items: center; gap: 0.5rem;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
+                                <line x1="12" y1="5" x2="12" y2="19"/>
+                                <line x1="5" y1="12" x2="19" y2="12"/>
+                            </svg>
+                            <span>添加源</span>
+                        </button>
+                        <button id="download-proxy-script-btn" class="btn-secondary" style="display: flex; align-items: center; gap: 0.5rem;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="7 10 12 15 17 10"/>
+                                <line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                            <span>下载客户端脚本</span>
+                        </button>
+                        <button id="refresh-sources-btn" class="btn-secondary" style="display: flex; align-items: center; gap: 0.5rem;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
+                                <polyline points="23 4 23 10 17 10"/>
+                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                            </svg>
+                            <span>刷新</span>
+                        </button>
+                    </div>
+
+                    <!-- 统计卡片 -->
+                    <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+                        <div class="stat-card glass" style="padding: 1.5rem;">
+                            <div style="display: flex; align-items: center; gap: 1rem;">
+                                <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center;">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" style="width: 24px; height: 24px;">
+                                        <rect x="3" y="3" width="7" height="7"/>
+                                        <rect x="14" y="3" width="7" height="7"/>
+                                        <rect x="14" y="14" width="7" height="7"/>
+                                        <rect x="3" y="14" width="7" height="7"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <div style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 0.25rem;">总源数</div>
+                                    <div id="total-sources-count" style="font-size: 1.75rem; font-weight: 600; color: var(--text-primary);">0</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stat-card glass" style="padding: 1.5rem;">
+                            <div style="display: flex; align-items: center; gap: 1rem;">
+                                <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); display: flex; align-items: center; justify-content: center;">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" style="width: 24px; height: 24px;">
+                                        <polyline points="9 11 12 14 22 4"/>
+                                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <div style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 0.25rem;">已启用</div>
+                                    <div id="enabled-sources-count" style="font-size: 1.75rem; font-weight: 600; color: var(--text-primary);">0</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stat-card glass" style="padding: 1.5rem;">
+                            <div style="display: flex; align-items: center; gap: 1rem;">
+                                <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); display: flex; align-items: center; justify-content: center;">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" style="width: 24px; height: 24px;">
+                                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                                        <polyline points="22 4 12 14.01 9 11.01"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <div style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 0.25rem;">运行正常</div>
+                                    <div id="healthy-sources-count" style="font-size: 1.75rem; font-weight: 600; color: var(--text-primary);">0</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 源列表 -->
+                    <div class="glass" style="padding: 1.5rem;">
+                        <div id="sources-list" style="display: flex; flex-direction: column; gap: 1rem;">
+                            <p style="color: var(--text-secondary); padding: 2rem; text-align: center;">暂无音乐源</p>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 关于视图 -->
                 <div id="view-about" class="view">
                     <div class="glass" style="padding: 40px; max-width: 900px; margin: 0 auto;">
@@ -928,6 +1021,66 @@
             <div class="modal-footer" style="display: flex; gap: 1rem; justify-content: flex-end; padding: 1.5rem; border-top: 1px solid var(--glass-border);">
                 <button id="confirm-download-btn" class="btn-primary">开始下载</button>
                 <button class="btn-secondary" onclick="document.getElementById('manual-download-modal').classList.add('hidden')">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加源模态框 -->
+    <div id="add-source-modal" class="modal hidden">
+        <div class="modal-content glass" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3>添加音乐源</h3>
+                <button class="modal-close" onclick="document.getElementById('add-source-modal').classList.add('hidden')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- 添加方式选择 -->
+                <div class="form-group" style="margin-bottom: 1.5rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">添加方式</label>
+                    <div style="display: flex; gap: 1rem;">
+                        <label class="radio-label" style="flex: 1; display: flex; align-items: center; padding: 1rem; background: var(--bg-tertiary); border: 2px solid var(--glass-border); border-radius: 8px; cursor: pointer;">
+                            <input type="radio" name="add-method" value="file" checked style="margin-right: 0.5rem;">
+                            <span>上传文件</span>
+                        </label>
+                        <label class="radio-label" style="flex: 1; display: flex; align-items: center; padding: 1rem; background: var(--bg-tertiary); border: 2px solid var(--glass-border); border-radius: 8px; cursor: pointer;">
+                            <input type="radio" name="add-method" value="url" style="margin-right: 0.5rem;">
+                            <span>URL导入</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 文件上传区域 -->
+                <div id="file-upload-area" class="form-group" style="margin-bottom: 1.5rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">选择脚本文件</label>
+                    <div style="position: relative;">
+                        <input type="file" id="source-file-input" accept=".js" style="display: none;">
+                        <button id="select-file-btn" class="btn-secondary" style="width: 100%; padding: 1rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="17 8 12 3 7 8"/>
+                                <line x1="12" y1="3" x2="12" y2="15"/>
+                            </svg>
+                            <span>选择文件</span>
+                        </button>
+                        <div id="selected-file-name" style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);"></div>
+                    </div>
+                </div>
+
+                <!-- URL导入区域 -->
+                <div id="url-import-area" class="form-group" style="margin-bottom: 1.5rem; display: none;">
+                    <label style="display: block; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">脚本URL</label>
+                    <input type="text" id="source-url-input" class="form-input" placeholder="https://example.com/script.js" style="width: 100%; padding: 0.75rem; background: var(--bg-tertiary); border: 1px solid var(--glass-border); border-radius: 8px; color: var(--text-primary);">
+                    <p style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">输入脚本文件的URL地址</p>
+                </div>
+
+                <!-- 验证结果 -->
+                <div id="validation-result" style="display: none; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                    <div id="validation-message"></div>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; gap: 1rem; justify-content: flex-end; padding: 1.5rem; border-top: 1px solid var(--glass-border);">
+                <button id="validate-source-btn" class="btn-secondary">验证脚本</button>
+                <button id="confirm-add-source-btn" class="btn-primary" disabled>添加</button>
+                <button class="btn-secondary" onclick="document.getElementById('add-source-modal').classList.add('hidden')">取消</button>
             </div>
         </div>
     </div>

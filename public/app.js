@@ -114,6 +114,9 @@ class App {
         // 下载管理
         this.bindDownloadEvents();
 
+        // 音乐源管理
+        this.bindSourcesEvents();
+
         // PWA 安装事件
         this.deferredPrompt = null;
         window.addEventListener('beforeinstallprompt', (e) => {
@@ -238,6 +241,7 @@ class App {
             users: '用户管理',
             data: '数据查看',
             downloads: '下载管理',
+            sources: '音乐源管理',
             config: '系统配置',
             logs: '系统日志',
             webdav: 'WebDAV同步',
@@ -263,6 +267,9 @@ class App {
             case 'downloads':
                 this.loadDownloadTasks();
                 this.initDownloadSSE();
+                break;
+            case 'sources':
+                this.loadCustomSources();
                 break;
             case 'config':
                 this.loadConfig();
@@ -2452,10 +2459,31 @@ class App {
             this.currentDownloadTasks.push(task);
         }
 
+        // 检查当前过滤器
+        const filter = document.getElementById('task-status-filter')?.value;
+        const shouldShow = !filter || task.status === filter;
+
         // 更新 DOM
         const taskElement = document.querySelector(`[data-task-id="${task.id}"]`);
         if (taskElement) {
-            taskElement.outerHTML = this.renderTaskItem(task);
+            // 任务在DOM中
+            if (shouldShow) {
+                // 应该显示，更新它
+                taskElement.outerHTML = this.renderTaskItem(task);
+            } else {
+                // 不应该显示，移除它
+                taskElement.remove();
+            }
+        } else if (shouldShow) {
+            // 任务不在DOM中，但应该显示，添加它
+            const container = document.getElementById('download-tasks-list');
+            if (container) {
+                const emptyMsg = container.querySelector('p');
+                if (emptyMsg) {
+                    emptyMsg.remove();
+                }
+                container.insertAdjacentHTML('afterbegin', this.renderTaskItem(task));
+            }
         }
     }
 
@@ -2616,6 +2644,321 @@ class App {
             console.error('Failed to start download:', err);
             alert('启动下载失败: ' + err.message);
         }
+    }
+
+    // ========== 音乐源管理 ==========
+    bindSourcesEvents() {
+        // 添加源按钮
+        const addSourceBtn = document.getElementById('add-source-btn');
+        if (addSourceBtn) {
+            addSourceBtn.addEventListener('click', () => this.showAddSourceModal());
+        }
+
+        // 下载客户端脚本按钮
+        const downloadProxyScriptBtn = document.getElementById('download-proxy-script-btn');
+        if (downloadProxyScriptBtn) {
+            downloadProxyScriptBtn.addEventListener('click', () => this.downloadProxyScript());
+        }
+
+        // 刷新源列表按钮
+        const refreshSourcesBtn = document.getElementById('refresh-sources-btn');
+        if (refreshSourcesBtn) {
+            refreshSourcesBtn.addEventListener('click', () => this.loadCustomSources());
+        }
+
+        // 添加源模态框相关事件
+        const addMethodRadios = document.querySelectorAll('input[name="add-method"]');
+        addMethodRadios.forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                const fileArea = document.getElementById('file-upload-area');
+                const urlArea = document.getElementById('url-import-area');
+                if (e.target.value === 'file') {
+                    fileArea.style.display = 'block';
+                    urlArea.style.display = 'none';
+                } else {
+                    fileArea.style.display = 'none';
+                    urlArea.style.display = 'block';
+                }
+            });
+        });
+
+        // 选择文件按钮
+        const selectFileBtn = document.getElementById('select-file-btn');
+        const fileInput = document.getElementById('source-file-input');
+        if (selectFileBtn && fileInput) {
+            selectFileBtn.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                const fileNameDisplay = document.getElementById('selected-file-name');
+                if (file && fileNameDisplay) {
+                    fileNameDisplay.textContent = `已选择: ${file.name}`;
+                }
+            });
+        }
+
+        // 验证脚本按钮
+        const validateBtn = document.getElementById('validate-source-btn');
+        if (validateBtn) {
+            validateBtn.addEventListener('click', () => this.validateScript());
+        }
+
+        // 确认添加按钮
+        const confirmAddBtn = document.getElementById('confirm-add-source-btn');
+        if (confirmAddBtn) {
+            confirmAddBtn.addEventListener('click', () => this.addSource());
+        }
+    }
+
+    async loadCustomSources() {
+        try {
+            const sources = await this.request('/api/custom-source/list?username=open');
+            this.renderSourcesList(sources);
+            this.updateSourcesStats(sources);
+        } catch (err) {
+            console.error('Failed to load sources:', err);
+            alert('加载源列表失败: ' + err.message);
+        }
+    }
+
+    updateSourcesStats(sources) {
+        const totalCount = sources.length;
+        const enabledCount = sources.filter(s => s.enabled).length;
+        const healthyCount = sources.filter(s => s.enabled && s.status === 'success').length;
+
+        const totalEl = document.getElementById('total-sources-count');
+        const enabledEl = document.getElementById('enabled-sources-count');
+        const healthyEl = document.getElementById('healthy-sources-count');
+
+        if (totalEl) totalEl.textContent = totalCount;
+        if (enabledEl) enabledEl.textContent = enabledCount;
+        if (healthyEl) healthyEl.textContent = healthyCount;
+    }
+
+    renderSourcesList(sources) {
+        const listEl = document.getElementById('sources-list');
+        if (!listEl) return;
+
+        if (sources.length === 0) {
+            listEl.innerHTML = '<p style="color: var(--text-secondary); padding: 2rem; text-align: center;">暂无音乐源</p>';
+            return;
+        }
+
+        listEl.innerHTML = sources.map(source => this.renderSourceItem(source)).join('');
+
+        // 绑定操作按钮事件
+        sources.forEach(source => {
+            const toggleBtn = document.getElementById(`toggle-source-${source.id}`);
+            const deleteBtn = document.getElementById(`delete-source-${source.id}`);
+
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', () => this.toggleSource(source.id, !source.enabled));
+            }
+            if (deleteBtn) {
+                deleteBtn.addEventListener('click', () => this.deleteSource(source.id));
+            }
+        });
+    }
+
+    renderSourceItem(source) {
+        const statusColor = source.enabled ? (source.status === 'success' ? '#10b981' : '#ef4444') : '#6b7280';
+        const statusText = source.enabled ? (source.status === 'success' ? '运行正常' : '加载失败') : '已禁用';
+        const supportedPlatforms = (source.supportedSources || []).join(', ');
+
+        return `
+            <div class="source-item" style="padding: 1.5rem; background: var(--bg-secondary); border: 1px solid var(--glass-border); border-radius: 12px;">
+                <div style="display: flex; align-items: flex-start; gap: 1rem;">
+                    <div style="flex: 1;">
+                        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem;">
+                            <h3 style="margin: 0; font-size: 1.125rem; color: var(--text-primary);">${source.name}</h3>
+                            <span style="display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.25rem 0.75rem; background: ${statusColor}20; color: ${statusColor}; border-radius: 9999px; font-size: 0.75rem; font-weight: 500;">
+                                <span style="width: 6px; height: 6px; background: ${statusColor}; border-radius: 50%;"></span>
+                                ${statusText}
+                            </span>
+                        </div>
+                        <p style="margin: 0.5rem 0; color: var(--text-secondary); font-size: 0.875rem;">${source.description || '无描述'}</p>
+                        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem;">
+                            <span style="font-size: 0.75rem; color: var(--text-secondary);">版本: ${source.version}</span>
+                            <span style="font-size: 0.75rem; color: var(--text-secondary);">作者: ${source.author || '未知'}</span>
+                            <span style="font-size: 0.75rem; color: var(--text-secondary);">支持平台: ${supportedPlatforms || '无'}</span>
+                        </div>
+                        ${source.error ? `<div style="margin-top: 0.5rem; padding: 0.5rem; background: #ef444420; border-left: 3px solid #ef4444; border-radius: 4px; font-size: 0.875rem; color: #ef4444;">错误: ${source.error}</div>` : ''}
+                    </div>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button id="toggle-source-${source.id}" class="btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.875rem;">
+                            ${source.enabled ? '禁用' : '启用'}
+                        </button>
+                        <button id="delete-source-${source.id}" class="btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.875rem; color: #ef4444;">
+                            删除
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    showAddSourceModal() {
+        const modal = document.getElementById('add-source-modal');
+        if (modal) {
+            modal.classList.remove('hidden');
+            // 重置表单
+            document.getElementById('source-file-input').value = '';
+            document.getElementById('source-url-input').value = '';
+            document.getElementById('selected-file-name').textContent = '';
+            document.getElementById('validation-result').style.display = 'none';
+            document.getElementById('confirm-add-source-btn').disabled = true;
+        }
+    }
+
+    async validateScript() {
+        const addMethod = document.querySelector('input[name="add-method"]:checked').value;
+        let scriptContent = '';
+
+        try {
+            if (addMethod === 'file') {
+                const fileInput = document.getElementById('source-file-input');
+                const file = fileInput.files[0];
+                if (!file) {
+                    alert('请选择文件');
+                    return;
+                }
+                scriptContent = await file.text();
+            } else {
+                const urlInput = document.getElementById('source-url-input');
+                const url = urlInput.value.trim();
+                if (!url) {
+                    alert('请输入URL');
+                    return;
+                }
+                const response = await fetch(url);
+                scriptContent = await response.text();
+            }
+
+            const result = await this.request('/api/custom-source/validate', {
+                method: 'POST',
+                body: JSON.stringify({ script: scriptContent })
+            });
+
+            const validationResult = document.getElementById('validation-result');
+            const validationMessage = document.getElementById('validation-message');
+
+            if (result.valid) {
+                validationResult.style.display = 'block';
+                validationResult.style.background = '#10b98120';
+                validationResult.style.borderLeft = '3px solid #10b981';
+                validationMessage.innerHTML = `
+                    <div style="color: #10b981; font-weight: 500;">✓ 脚本验证通过</div>
+                    <div style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">
+                        支持平台: ${result.sources.join(', ')}<br>
+                        源数量: ${result.sourcesCount}
+                    </div>
+                `;
+                document.getElementById('confirm-add-source-btn').disabled = false;
+            } else {
+                validationResult.style.display = 'block';
+                validationResult.style.background = '#ef444420';
+                validationResult.style.borderLeft = '3px solid #ef4444';
+                validationMessage.innerHTML = `
+                    <div style="color: #ef4444; font-weight: 500;">✗ 脚本验证失败</div>
+                    <div style="margin-top: 0.5rem; font-size: 0.875rem; color: #ef4444;">${result.error}</div>
+                `;
+                document.getElementById('confirm-add-source-btn').disabled = true;
+            }
+        } catch (err) {
+            console.error('Validation error:', err);
+            alert('验证失败: ' + err.message);
+        }
+    }
+
+    async addSource() {
+        const addMethod = document.querySelector('input[name="add-method"]:checked').value;
+
+        try {
+            if (addMethod === 'file') {
+                const fileInput = document.getElementById('source-file-input');
+                const file = fileInput.files[0];
+                if (!file) {
+                    alert('请选择文件');
+                    return;
+                }
+                const content = await file.text();
+                await this.request('/api/custom-source/upload', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        filename: file.name,
+                        content: content,
+                        username: 'open'
+                    })
+                });
+            } else {
+                const urlInput = document.getElementById('source-url-input');
+                const url = urlInput.value.trim();
+                if (!url) {
+                    alert('请输入URL');
+                    return;
+                }
+                await this.request('/api/custom-source/import', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        url: url,
+                        username: 'open'
+                    })
+                });
+            }
+
+            alert('添加成功');
+            document.getElementById('add-source-modal').classList.add('hidden');
+            await this.loadCustomSources();
+        } catch (err) {
+            console.error('Add source error:', err);
+            alert('添加失败: ' + err.message);
+        }
+    }
+
+    async toggleSource(sourceId, enabled) {
+        try {
+            await this.request('/api/custom-source/toggle', {
+                method: 'POST',
+                body: JSON.stringify({
+                    id: sourceId,
+                    enabled: enabled,
+                    username: 'open'
+                })
+            });
+            await this.loadCustomSources();
+        } catch (err) {
+            console.error('Toggle source error:', err);
+            alert('操作失败: ' + err.message);
+        }
+    }
+
+    async deleteSource(sourceId) {
+        if (!confirm('确定要删除这个音乐源吗？')) {
+            return;
+        }
+
+        try {
+            await this.request('/api/custom-source/delete', {
+                method: 'POST',
+                body: JSON.stringify({
+                    id: sourceId,
+                    username: 'open'
+                })
+            });
+            alert('删除成功');
+            await this.loadCustomSources();
+        } catch (err) {
+            console.error('Delete source error:', err);
+            alert('删除失败: ' + err.message);
+        }
+    }
+
+    downloadProxyScript() {
+        const link = document.createElement('a');
+        link.href = '/api/proxy/script';
+        link.download = 'lx_proxy_source.js';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     }
 }
 

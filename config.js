@@ -103,7 +103,7 @@ module.exports = {
 
   // 是否启用自动下载
   // 环境变量: DOWNLOAD_AUTO_ENABLED (true/false)
-  "download.autoEnabled": true,
+  "download.autoEnabled": false,
 
   // 自动下载检查间隔 (分钟)
   // 环境变量: DOWNLOAD_AUTO_INTERVAL
